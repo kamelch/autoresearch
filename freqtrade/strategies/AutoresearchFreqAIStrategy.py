@@ -6,7 +6,7 @@ import math
 import talib.abstract as ta
 from pandas import DataFrame
 
-from freqtrade.strategy import IStrategy
+from freqtrade.strategy import DecimalParameter, IStrategy
 
 
 class AutoresearchFreqAIStrategy(IStrategy):
@@ -34,6 +34,33 @@ class AutoresearchFreqAIStrategy(IStrategy):
     short_prob_max = 0.44
     long_exit_prob_max = 0.4
     short_exit_prob_min = 0.54
+
+    # Hyperoptable entry/exit parameters (exported to strategy JSON by freqtrade hyperopt).
+    long_entry_ret_param = DecimalParameter(
+        0.001, 0.030, default=long_entry_ret, decimals=3, space="buy", optimize=True, load=True
+    )
+    long_prob_min_param = DecimalParameter(
+        0.50, 0.85, default=long_prob_min, decimals=2, space="buy", optimize=True, load=True
+    )
+    short_exit_ret_param = DecimalParameter(
+        -0.010, 0.010, default=short_exit_ret, decimals=3, space="buy", optimize=True, load=True
+    )
+    short_exit_prob_min_param = DecimalParameter(
+        0.40, 0.80, default=short_exit_prob_min, decimals=2, space="buy", optimize=True, load=True
+    )
+
+    short_entry_ret_param = DecimalParameter(
+        -0.030, -0.001, default=short_entry_ret, decimals=3, space="sell", optimize=True, load=True
+    )
+    short_prob_max_param = DecimalParameter(
+        0.20, 0.60, default=short_prob_max, decimals=2, space="sell", optimize=True, load=True
+    )
+    long_exit_ret_param = DecimalParameter(
+        -0.010, 0.010, default=long_exit_ret, decimals=3, space="sell", optimize=True, load=True
+    )
+    long_exit_prob_max_param = DecimalParameter(
+        0.20, 0.70, default=long_exit_prob_max, decimals=2, space="sell", optimize=True, load=True
+    )
 
     minimal_roi = {
         "0": 0.02,
@@ -127,17 +154,34 @@ class AutoresearchFreqAIStrategy(IStrategy):
         """Use conservative leverage by default."""
         return min(self.desired_leverage, max_leverage)
 
+    def _entry_thresholds(self) -> tuple[float, float, float, float]:
+        return (
+            float(self.long_entry_ret_param.value),
+            float(self.short_entry_ret_param.value),
+            float(self.long_prob_min_param.value),
+            float(self.short_prob_max_param.value),
+        )
+
+    def _exit_thresholds(self) -> tuple[float, float, float, float]:
+        return (
+            float(self.long_exit_ret_param.value),
+            float(self.short_exit_ret_param.value),
+            float(self.long_exit_prob_max_param.value),
+            float(self.short_exit_prob_min_param.value),
+        )
+
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        long_entry_ret, short_entry_ret, long_prob_min, short_prob_max = self._entry_thresholds()
         long_conditions = [
             dataframe["do_predict"] == 1,
-            dataframe["&-fwd_return"] > self.long_entry_ret,
-            dataframe["pred_prob_up"] >= self.long_prob_min,
+            dataframe["&-fwd_return"] > long_entry_ret,
+            dataframe["pred_prob_up"] >= long_prob_min,
             dataframe["volume"] > 0,
         ]
         short_conditions = [
             dataframe["do_predict"] == 1,
-            dataframe["&-fwd_return"] < self.short_entry_ret,
-            dataframe["pred_prob_up"] <= self.short_prob_max,
+            dataframe["&-fwd_return"] < short_entry_ret,
+            dataframe["pred_prob_up"] <= short_prob_max,
             dataframe["volume"] > 0,
         ]
         if long_conditions:
@@ -153,14 +197,15 @@ class AutoresearchFreqAIStrategy(IStrategy):
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        long_exit_ret, short_exit_ret, long_exit_prob_max, short_exit_prob_min = self._exit_thresholds()
         long_exit_conditions = [
             dataframe["do_predict"] == 1,
-            (dataframe["&-fwd_return"] < self.long_exit_ret) | (dataframe["pred_prob_up"] <= self.long_exit_prob_max),
+            (dataframe["&-fwd_return"] < long_exit_ret) | (dataframe["pred_prob_up"] <= long_exit_prob_max),
             dataframe["volume"] > 0,
         ]
         short_exit_conditions = [
             dataframe["do_predict"] == 1,
-            (dataframe["&-fwd_return"] > self.short_exit_ret) | (dataframe["pred_prob_up"] >= self.short_exit_prob_min),
+            (dataframe["&-fwd_return"] > short_exit_ret) | (dataframe["pred_prob_up"] >= short_exit_prob_min),
             dataframe["volume"] > 0,
         ]
         if long_exit_conditions:

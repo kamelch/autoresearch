@@ -1,0 +1,6 @@
+{
+  "api_key": "sk-your-openai-api-key",
+  "base_url": "https://api.openai.com/v1",
+  "organization": "",
+  "project": ""
+}

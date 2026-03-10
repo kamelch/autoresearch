@@ -178,6 +178,21 @@ Optional:
 - `--campaign-id <id>` to force a specific campaign ID
 - `--profile /path/to/profile.json` to force a specific profile
 - `--no-space-adaptation` to disable automatic search-space updates
+- `--llm-enable` to run LLM-generated LSTM patches each iteration (before hyperopt/train/holdout)
+- `--llm-model gpt-5-mini` (default)
+- `--llm-credentials-file ~/.config/autoresearch/openai.json`
+- `--llm-sync-upstream --llm-upstream-ref main` to add optional `karpathy/autoresearch` context snippets
+
+LLM credentials JSON format (`~/.config/autoresearch/openai.json` by default):
+
+```json
+{
+  "api_key": "sk-...",
+  "base_url": "https://api.openai.com/v1",
+  "organization": "org_optional",
+  "project": "proj_optional"
+}
+```
 
 ### Migration note (`results.tsv` vs v2 campaign TSV)
 
