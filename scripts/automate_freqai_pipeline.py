@@ -165,6 +165,34 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-space-adaptation", action="store_true", help="Disable automatic search-space adaptation")
     parser.add_argument("--min-improvement", type=float, default=0.0, help="Required score improvement to keep")
     parser.add_argument("--dd-penalty", type=float, default=0.5, help="Score penalty weight on drawdown")
+    parser.add_argument("--hyperopt-cadence", type=int, default=5, help="Run hyperopt every N loop iterations")
+    parser.add_argument("--hyperopt-epochs", type=int, default=100, help="Hyperopt epochs per run")
+    parser.add_argument("--hyperopt-spaces", default="all", help="Hyperopt spaces argument, e.g. 'all' or 'buy sell'")
+    parser.add_argument(
+        "--hyperopt-loss",
+        default="ProfitDrawDownHyperOptLoss",
+        help="Hyperopt loss class name",
+    )
+    parser.add_argument("--hyperopt-jobs", type=int, default=-1, help="Hyperopt worker jobs")
+    parser.add_argument("--hyperopt-min-trades", type=int, default=1, help="Hyperopt min trades filter")
+    parser.add_argument(
+        "--hyperopt-ignore-missing-spaces",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Pass --ignore-missing-spaces to hyperopt",
+    )
+    parser.add_argument("--llm-enable", action="store_true", help="Enable LLM patch-generation stage in loop iterations")
+    parser.add_argument("--llm-model", default="gpt-5-mini", help="OpenAI model for patch generation")
+    parser.add_argument(
+        "--llm-credentials-file",
+        default="~/.config/autoresearch/openai.json",
+        help="Credentials JSON path used by loop for OpenAI API",
+    )
+    parser.add_argument("--llm-repair-attempts", type=int, default=2, help="Automatic repair retries for failed LLM patches")
+    parser.add_argument("--llm-context-rows", type=int, default=10, help="Recent rows to include in LLM prompt context")
+    parser.add_argument("--llm-timeout-sec", type=int, default=60, help="HTTP timeout for LLM requests")
+    parser.add_argument("--llm-sync-upstream", action="store_true", help="Fetch optional karpathy/autoresearch context snippets")
+    parser.add_argument("--llm-upstream-ref", default="main", help="Upstream ref used when --llm-sync-upstream is set")
 
     parser.add_argument("--min-profit-pct", type=float, default=0.0, help="Absolute gate: minimum total profit %%")
     parser.add_argument("--max-drawdown-pct", type=float, default=12.0, help="Absolute gate: maximum drawdown %%")
@@ -182,6 +210,16 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    if args.hyperopt_cadence < 1:
+        raise ValueError("--hyperopt-cadence must be >= 1")
+    if args.hyperopt_epochs < 1:
+        raise ValueError("--hyperopt-epochs must be >= 1")
+    if args.llm_repair_attempts < 0:
+        raise ValueError("--llm-repair-attempts must be >= 0")
+    if args.llm_context_rows < 1:
+        raise ValueError("--llm-context-rows must be >= 1")
+    if args.llm_timeout_sec < 1:
+        raise ValueError("--llm-timeout-sec must be >= 1")
 
     repo_dir = pathlib.Path(args.repo_dir).expanduser().resolve() if args.repo_dir else pathlib.Path(__file__).resolve().parents[1]
     freqtrade_dir = pathlib.Path(args.freqtrade_dir).expanduser().resolve()
@@ -259,6 +297,40 @@ def main() -> int:
         rc = run_cmd(download_cmd, cwd=freqtrade_dir)
         if rc != 0:
             return rc
+
+    baseline_hyperopt_cmd = freqtrade_cmd + [
+        "hyperopt",
+        "--config",
+        args.config_dest,
+        "--strategy",
+        args.strategy,
+        "--timerange",
+        args.train_timerange,
+        "-e",
+        str(args.hyperopt_epochs),
+        "--spaces",
+        *shlex.split(args.hyperopt_spaces),
+        "--hyperopt-loss",
+        args.hyperopt_loss,
+        "-j",
+        str(args.hyperopt_jobs),
+        "--min-trades",
+        str(args.hyperopt_min_trades),
+        "--random-state",
+        "42",
+    ]
+    if args.hyperopt_ignore_missing_spaces:
+        baseline_hyperopt_cmd.append("--ignore-missing-spaces")
+    if strategy_path:
+        baseline_hyperopt_cmd.extend(["--strategy-path", strategy_path])
+    if args.freqaimodel:
+        baseline_hyperopt_cmd.extend(["--freqaimodel", args.freqaimodel])
+    if freqaimodel_path:
+        baseline_hyperopt_cmd.extend(["--freqaimodel-path", freqaimodel_path])
+
+    rc = run_cmd(baseline_hyperopt_cmd, cwd=freqtrade_dir)
+    if rc != 0:
+        return rc
 
     baseline_candidate = "baseline"
     baseline_train_cmd = [
@@ -414,9 +486,41 @@ def main() -> int:
         str(args.pair_min_trades_floor),
         "--pair-min-trades-mode",
         args.pair_min_trades_mode,
+        "--hyperopt-cadence",
+        str(args.hyperopt_cadence),
+        "--hyperopt-epochs",
+        str(args.hyperopt_epochs),
+        "--hyperopt-spaces",
+        args.hyperopt_spaces,
+        "--hyperopt-loss",
+        args.hyperopt_loss,
+        "--hyperopt-jobs",
+        str(args.hyperopt_jobs),
+        "--hyperopt-min-trades",
+        str(args.hyperopt_min_trades),
+        "--llm-model",
+        args.llm_model,
+        "--llm-credentials-file",
+        args.llm_credentials_file,
+        "--llm-repair-attempts",
+        str(args.llm_repair_attempts),
+        "--llm-context-rows",
+        str(args.llm_context_rows),
+        "--llm-timeout-sec",
+        str(args.llm_timeout_sec),
+        "--llm-upstream-ref",
+        args.llm_upstream_ref,
     ]
+    if args.hyperopt_ignore_missing_spaces:
+        loop_cmd.append("--hyperopt-ignore-missing-spaces")
+    else:
+        loop_cmd.append("--no-hyperopt-ignore-missing-spaces")
     if args.no_space_adaptation:
         loop_cmd.append("--no-space-adaptation")
+    if args.llm_enable:
+        loop_cmd.append("--llm-enable")
+    if args.llm_sync_upstream:
+        loop_cmd.append("--llm-sync-upstream")
 
     rc = run_cmd(loop_cmd, cwd=repo_dir)
     if rc != 0:

@@ -10,12 +10,15 @@ import json
 import pathlib
 import random
 import re
+import shlex
 import signal
 import subprocess
+import shutil
 import sys
 from typing import Any
 
 from autoresearch_utils import exclusive_lock, profile_fingerprint
+import llm_patch_engine
 
 
 NUM_RE = r"[-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?"
@@ -494,6 +497,216 @@ def restore_strategy(strategy_file: pathlib.Path, text: str) -> None:
     strategy_file.write_text(text, encoding="utf-8")
 
 
+def read_optional_text(path: pathlib.Path) -> str | None:
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return None
+
+
+def restore_optional_file(path: pathlib.Path, text: str | None) -> None:
+    if text is None:
+        if path.exists():
+            path.unlink()
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def resolve_freqtrade_cmd(freqtrade_dir: pathlib.Path, freqtrade_bin: str | None) -> list[str]:
+    if freqtrade_bin:
+        tokens = shlex.split(freqtrade_bin)
+        if len(tokens) == 1:
+            candidate = pathlib.Path(tokens[0]).expanduser()
+            if candidate.exists():
+                return [str(candidate.resolve())]
+            in_path = shutil.which(tokens[0])
+            if in_path:
+                return [in_path]
+        return tokens
+
+    local_candidates = [
+        freqtrade_dir / ".venv" / "bin" / "freqtrade",
+        freqtrade_dir / ".env" / "bin" / "freqtrade",
+    ]
+    for candidate in local_candidates:
+        if candidate.exists():
+            return [str(candidate)]
+
+    in_path = shutil.which("freqtrade")
+    if in_path:
+        return [in_path]
+
+    return [sys.executable, "-m", "freqtrade"]
+
+
+def run_stream_cmd(cmd: list[str], cwd: pathlib.Path) -> int:
+    print(f"$ {' '.join(cmd)}", flush=True)
+    proc = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        print(line, end="", flush=True)
+    return proc.wait()
+
+
+def should_run_hyperopt(iteration: int, cadence: int) -> bool:
+    return iteration == 1 or ((iteration - 1) % cadence == 0)
+
+
+def run_hyperopt(
+    freqtrade_dir: pathlib.Path,
+    freqtrade_bin: str | None,
+    config: str,
+    strategy: str,
+    strategy_path: str | None,
+    freqaimodel: str | None,
+    freqaimodel_path: str | None,
+    timerange: str,
+    epochs: int,
+    spaces: str,
+    loss: str,
+    jobs: int,
+    min_trades: int,
+    random_state: int,
+    ignore_missing_spaces: bool,
+) -> int:
+    freqtrade_cmd = resolve_freqtrade_cmd(freqtrade_dir, freqtrade_bin)
+    cmd = freqtrade_cmd + [
+        "hyperopt",
+        "--config",
+        config,
+        "--strategy",
+        strategy,
+        "--timerange",
+        timerange,
+        "-e",
+        str(epochs),
+        "--spaces",
+        *shlex.split(spaces),
+        "--hyperopt-loss",
+        loss,
+        "-j",
+        str(jobs),
+        "--min-trades",
+        str(min_trades),
+        "--random-state",
+        str(random_state),
+    ]
+    if ignore_missing_spaces:
+        cmd.append("--ignore-missing-spaces")
+    if strategy_path:
+        cmd.extend(["--strategy-path", strategy_path])
+    if freqaimodel:
+        cmd.extend(["--freqaimodel", freqaimodel])
+    if freqaimodel_path:
+        cmd.extend(["--freqaimodel-path", freqaimodel_path])
+    return run_stream_cmd(cmd, cwd=freqtrade_dir)
+
+
+def run_llm_patch_stage(
+    *,
+    repo_dir: pathlib.Path,
+    model_file: pathlib.Path,
+    campaign_id: str,
+    results_tsv: pathlib.Path,
+    review_log: pathlib.Path,
+    llm_model: str,
+    credentials_file: pathlib.Path,
+    context_rows: int,
+    timeout_sec: int,
+    repair_attempts: int,
+    upstream_bundle: dict[str, Any] | None,
+) -> dict[str, Any]:
+    allowed_rel_path = "freqtrade/freqaimodels/AutoresearchLSTMRegressor.py"
+    base_source = read_strategy_text(model_file)
+    max_attempts = max(1, repair_attempts + 1)
+
+    info: dict[str, Any] = {
+        "ran": True,
+        "model": llm_model,
+        "request_id": None,
+        "prompt_hash": None,
+        "patch_applied": False,
+        "repair_attempts_used": 0,
+        "error": None,
+        "patch_text": "",
+        "usage": None,
+        "upstream_ref": upstream_bundle.get("ref") if isinstance(upstream_bundle, dict) else None,
+        "upstream_commit": upstream_bundle.get("commit") if isinstance(upstream_bundle, dict) else None,
+    }
+
+    repair_hint: str | None = None
+    previous_patch: str | None = None
+
+    for attempt in range(1, max_attempts + 1):
+        info["repair_attempts_used"] = attempt - 1
+        restore_strategy(model_file, base_source)
+
+        try:
+            generated = llm_patch_engine.generate_patch_with_openai(
+                credentials_file=credentials_file,
+                model=llm_model,
+                target_relative_path=allowed_rel_path,
+                target_source=base_source,
+                results_tsv=results_tsv,
+                review_log=review_log,
+                campaign_id=campaign_id,
+                context_rows=context_rows,
+                timeout_sec=timeout_sec,
+                upstream_bundle=upstream_bundle,
+                repair_hint=repair_hint,
+                previous_patch=previous_patch,
+            )
+        except Exception as exc:
+            info["error"] = f"llm_request_failed: {exc}"
+            repair_hint = str(info["error"])
+            continue
+
+        patch_text = str(generated.get("patch_text") or "")
+        previous_patch = patch_text
+        info["patch_text"] = patch_text
+        info["request_id"] = generated.get("request_id")
+        info["prompt_hash"] = generated.get("prompt_hash")
+        info["usage"] = generated.get("usage")
+
+        if not patch_text.strip():
+            info["error"] = "empty_patch_from_llm"
+            repair_hint = str(info["error"])
+            continue
+
+        ok, target_error, _ = llm_patch_engine.validate_patch_targets(patch_text, allowed_rel_path)
+        if not ok:
+            info["error"] = target_error
+            repair_hint = str(target_error)
+            continue
+
+        ok, apply_error = llm_patch_engine.apply_unified_diff(repo_dir, patch_text)
+        if not ok:
+            info["error"] = apply_error
+            repair_hint = str(apply_error)
+            continue
+
+        ok, compile_error = llm_patch_engine.run_py_compile(model_file)
+        if not ok:
+            info["error"] = compile_error
+            repair_hint = str(compile_error)
+            continue
+
+        info["patch_applied"] = True
+        info["error"] = None
+        info["repair_attempts_used"] = attempt - 1
+        return info
+
+    restore_strategy(model_file, base_source)
+    return info
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Autoresearch loop for FreqAI strategy tuning")
     parser.add_argument("--freqtrade-dir", required=True, help="Path to Freqtrade project")
@@ -529,6 +742,34 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--weight-down", type=float, default=0.9, help="Multiplier for parameter weight after discard")
     parser.add_argument("--weight-crash", type=float, default=0.75, help="Multiplier for parameter weight after crash")
     parser.add_argument("--review-log", default=None, help="Optional JSONL file for per-iteration review records")
+    parser.add_argument("--hyperopt-cadence", type=int, default=5, help="Run hyperopt every N iterations (1, 1+N, ...)")
+    parser.add_argument("--hyperopt-epochs", type=int, default=100, help="Hyperopt epochs per run")
+    parser.add_argument("--hyperopt-spaces", default="all", help="Hyperopt spaces argument, e.g. 'all' or 'buy sell'")
+    parser.add_argument(
+        "--hyperopt-loss",
+        default="ProfitDrawDownHyperOptLoss",
+        help="Hyperopt loss class name",
+    )
+    parser.add_argument("--hyperopt-jobs", type=int, default=-1, help="Hyperopt worker jobs")
+    parser.add_argument("--hyperopt-min-trades", type=int, default=1, help="Hyperopt min trades filter")
+    parser.add_argument(
+        "--hyperopt-ignore-missing-spaces",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Pass --ignore-missing-spaces to freqtrade hyperopt",
+    )
+    parser.add_argument("--llm-enable", action="store_true", help="Enable LLM-generated model patching each iteration")
+    parser.add_argument("--llm-model", default="gpt-5-mini", help="OpenAI model used for patch generation")
+    parser.add_argument(
+        "--llm-credentials-file",
+        default=str(llm_patch_engine.DEFAULT_CREDENTIALS_PATH),
+        help="Credentials JSON path (default: ~/.config/autoresearch/openai.json)",
+    )
+    parser.add_argument("--llm-repair-attempts", type=int, default=2, help="Automatic LLM repair retries after failed patch checks")
+    parser.add_argument("--llm-context-rows", type=int, default=10, help="Recent results/review rows to include in LLM context")
+    parser.add_argument("--llm-timeout-sec", type=int, default=60, help="HTTP timeout for LLM requests")
+    parser.add_argument("--llm-sync-upstream", action="store_true", help="Fetch optional karpathy/autoresearch context snippets")
+    parser.add_argument("--llm-upstream-ref", default="main", help="Upstream ref used when --llm-sync-upstream is set")
 
     parser.add_argument("--min-profit-pct", type=float, default=0.0, help="Absolute gate: minimum total profit %%")
     parser.add_argument("--max-drawdown-pct", type=float, default=12.0, help="Absolute gate: maximum drawdown %%")
@@ -584,6 +825,16 @@ def main() -> int:
         raise ValueError("Space adaptation scales must be > 0.")
     if args.min_span_steps < 1:
         raise ValueError("--min-span-steps must be >= 1.")
+    if args.hyperopt_cadence < 1:
+        raise ValueError("--hyperopt-cadence must be >= 1.")
+    if args.hyperopt_epochs < 1:
+        raise ValueError("--hyperopt-epochs must be >= 1.")
+    if args.llm_repair_attempts < 0:
+        raise ValueError("--llm-repair-attempts must be >= 0.")
+    if args.llm_context_rows < 1:
+        raise ValueError("--llm-context-rows must be >= 1.")
+    if args.llm_timeout_sec < 1:
+        raise ValueError("--llm-timeout-sec must be >= 1.")
 
     rng = random.Random(args.seed)
     profile = load_profile(profile_path)
@@ -593,6 +844,25 @@ def main() -> int:
     strategy_file = pathlib.Path(profile["strategy_file"])
     if not strategy_file.is_absolute():
         strategy_file = (repo_dir / strategy_file).resolve()
+    strategy_param_file = strategy_file.with_suffix(".json")
+    llm_model_file = (repo_dir / "freqtrade" / "freqaimodels" / "AutoresearchLSTMRegressor.py").resolve()
+    llm_credentials_file = pathlib.Path(args.llm_credentials_file).expanduser().resolve()
+    if args.llm_enable and not llm_model_file.exists():
+        raise FileNotFoundError(f"LLM target model file not found: {llm_model_file}")
+
+    upstream_bundle: dict[str, Any] | None = None
+    if args.llm_enable and args.llm_sync_upstream:
+        upstream_cache_dir = repo_dir / "freqtrade" / "runs" / f"upstream_cache_{args.campaign_id}"
+        upstream_bundle = llm_patch_engine.fetch_upstream_context_bundle(
+            cache_dir=upstream_cache_dir,
+            ref=args.llm_upstream_ref,
+            timeout_sec=args.llm_timeout_sec,
+        )
+        print(
+            "Upstream context:"
+            f" ref={upstream_bundle.get('ref')} commit={upstream_bundle.get('commit')} error={upstream_bundle.get('error')}",
+            flush=True,
+        )
 
     interrupted = {"signal": None}
 
@@ -627,9 +897,35 @@ def main() -> int:
                 _atomic_write_json(save_profile_path, adapted_profile)
 
             committed_text = read_strategy_text(strategy_file)
+            committed_param_text = read_optional_text(strategy_param_file)
+            committed_model_text = read_strategy_text(llm_model_file) if args.llm_enable else None
 
             if args.baseline_if_empty and not has_campaign_rows(results_tsv, args.campaign_id):
                 baseline_candidate = "baseline"
+                print("Running baseline hyperopt stage...", flush=True)
+                baseline_hyperopt_rc = run_hyperopt(
+                    freqtrade_dir=freqtrade_dir,
+                    freqtrade_bin=args.freqtrade_bin,
+                    config=args.config,
+                    strategy=args.strategy,
+                    strategy_path=args.strategy_path,
+                    freqaimodel=args.freqaimodel,
+                    freqaimodel_path=args.freqaimodel_path,
+                    timerange=args.train_timerange,
+                    epochs=args.hyperopt_epochs,
+                    spaces=args.hyperopt_spaces,
+                    loss=args.hyperopt_loss,
+                    jobs=args.hyperopt_jobs,
+                    min_trades=args.hyperopt_min_trades,
+                    random_state=args.seed,
+                    ignore_missing_spaces=args.hyperopt_ignore_missing_spaces,
+                )
+                if baseline_hyperopt_rc != 0:
+                    print("Baseline hyperopt failed. Stopping.", flush=True)
+                    restore_strategy(strategy_file, committed_text)
+                    restore_optional_file(strategy_param_file, committed_param_text)
+                    return baseline_hyperopt_rc
+                committed_param_text = read_optional_text(strategy_param_file)
                 print("Running baseline train stage...", flush=True)
                 train_proc = run_backtest_runner(
                     repo_dir=repo_dir,
@@ -691,65 +987,118 @@ def main() -> int:
                 if interrupted["signal"] is not None:
                     break
 
-                current_text = read_strategy_text(strategy_file)
-                param = weighted_choice(param_weights, rng)
-                param_state = space_state["params"][param]
-                current = parse_value(current_text, param)
-                ensure_current_inside_space(param_state, current)
-
-                spec = {
-                    "min": float(param_state["active_min"]),
-                    "max": float(param_state["active_max"]),
-                    "step": float(param_state["step"]),
-                }
-                proposed = mutate_value(current, spec, rng)
-                if proposed == current:
-                    print(f"[{i:03d}] skip {param}: no mutation possible", flush=True)
-                    continue
-
-                before_space = [float(param_state["active_min"]), float(param_state["active_max"])]
-
-                mutated_text = replace_assignment(current_text, param, proposed)
-                mutated_text = enforce_consistency(mutated_text)
-                strategy_file.write_text(mutated_text, encoding="utf-8")
-
                 candidate_id = f"cand_{i:04d}_{dt.datetime.now(dt.timezone.utc).strftime('%H%M%S')}"
-                desc = f"{param}: {current} -> {proposed}"
-                print(f"[{i:03d}] train {candidate_id} {desc} within {before_space[0]}..{before_space[1]}", flush=True)
+                strategy_mutation_enabled = not args.llm_enable
+                param: str | None = None
+                current: float | None = None
+                proposed: float | None = None
+                before_space: list[float] | None = None
+                after_space: list[float] | None = None
+                param_state: dict[str, Any] | None = None
+                desc = "llm_patch: AutoresearchLSTMRegressor.py"
 
-                train_proc = run_backtest_runner(
-                    repo_dir=repo_dir,
-                    freqtrade_dir=freqtrade_dir,
-                    config=args.config,
-                    freqtrade_bin=args.freqtrade_bin,
-                    strategy=args.strategy,
-                    strategy_path=args.strategy_path,
-                    freqaimodel=args.freqaimodel,
-                    freqaimodel_path=args.freqaimodel_path,
-                    timerange=args.train_timerange,
-                    description=f"{desc} [train]",
-                    results_tsv=results_tsv,
-                    dd_penalty=args.dd_penalty,
-                    min_improvement=args.min_improvement,
-                    campaign_id=args.campaign_id,
-                    candidate_id=candidate_id,
-                    stage="train",
-                    min_profit_pct=args.min_profit_pct,
-                    max_drawdown_pct=args.max_drawdown_pct,
-                    min_sharpe=args.min_sharpe,
-                    pair_min_trades_floor=args.pair_min_trades_floor,
-                    pair_min_trades_mode=args.pair_min_trades_mode,
-                )
+                llm_info: dict[str, Any] = {
+                    "ran": False,
+                    "model": args.llm_model,
+                    "request_id": None,
+                    "prompt_hash": None,
+                    "patch_applied": False,
+                    "repair_attempts_used": 0,
+                    "error": None,
+                    "patch_text": "",
+                    "usage": None,
+                    "upstream_ref": None,
+                    "upstream_commit": None,
+                }
 
-                train_row = read_last_matching_row(results_tsv, args.campaign_id, candidate_id, "train") or {}
-                train_suggestion = train_row.get("suggestion", "crash") if train_proc.returncode == 0 else "crash"
+                if strategy_mutation_enabled:
+                    current_text = read_strategy_text(strategy_file)
+                    param = weighted_choice(param_weights, rng)
+                    param_state = space_state["params"][param]
+                    current = parse_value(current_text, param)
+                    ensure_current_inside_space(param_state, current)
 
+                    spec = {
+                        "min": float(param_state["active_min"]),
+                        "max": float(param_state["active_max"]),
+                        "step": float(param_state["step"]),
+                    }
+                    proposed = mutate_value(current, spec, rng)
+                    if proposed == current:
+                        print(f"[{i:03d}] skip {param}: no mutation possible", flush=True)
+                        continue
+
+                    before_space = [float(param_state["active_min"]), float(param_state["active_max"])]
+                    desc = f"{param}: {current} -> {proposed}"
+
+                    mutated_text = replace_assignment(current_text, param, proposed)
+                    mutated_text = enforce_consistency(mutated_text)
+                    strategy_file.write_text(mutated_text, encoding="utf-8")
+                else:
+                    mutated_text = read_strategy_text(strategy_file)
+
+                llm_stage_ok = True
+                if args.llm_enable:
+                    print(f"[{i:03d}] llm_patch {candidate_id} {desc}", flush=True)
+                    llm_info = run_llm_patch_stage(
+                        repo_dir=repo_dir,
+                        model_file=llm_model_file,
+                        campaign_id=args.campaign_id,
+                        results_tsv=results_tsv,
+                        review_log=review_log,
+                        llm_model=args.llm_model,
+                        credentials_file=llm_credentials_file,
+                        context_rows=args.llm_context_rows,
+                        timeout_sec=args.llm_timeout_sec,
+                        repair_attempts=args.llm_repair_attempts,
+                        upstream_bundle=upstream_bundle,
+                    )
+                    llm_stage_ok = bool(llm_info.get("patch_applied"))
+
+                hyperopt_ran = should_run_hyperopt(i, args.hyperopt_cadence) if llm_stage_ok else False
+                hyperopt_returncode: int | None = None
+                if llm_stage_ok and hyperopt_ran:
+                    print(f"[{i:03d}] hyperopt {candidate_id} {desc}", flush=True)
+                    hyperopt_returncode = run_hyperopt(
+                        freqtrade_dir=freqtrade_dir,
+                        freqtrade_bin=args.freqtrade_bin,
+                        config=args.config,
+                        strategy=args.strategy,
+                        strategy_path=args.strategy_path,
+                        freqaimodel=args.freqaimodel,
+                        freqaimodel_path=args.freqaimodel_path,
+                        timerange=args.train_timerange,
+                        epochs=args.hyperopt_epochs,
+                        spaces=args.hyperopt_spaces,
+                        loss=args.hyperopt_loss,
+                        jobs=args.hyperopt_jobs,
+                        min_trades=args.hyperopt_min_trades,
+                        random_state=args.seed + i,
+                        ignore_missing_spaces=args.hyperopt_ignore_missing_spaces,
+                    )
+
+                train_row: dict[str, str] = {}
                 holdout_proc: subprocess.CompletedProcess[str] | None = None
                 holdout_row: dict[str, str] = {}
                 holdout_suggestion: str | None = None
-                if train_proc.returncode == 0 and train_suggestion == "keep":
-                    print(f"[{i:03d}] holdout {candidate_id} {desc}", flush=True)
-                    holdout_proc = run_backtest_runner(
+
+                if not llm_stage_ok:
+                    print(f"[{i:03d}] llm patch crash ({llm_info.get('error')})", flush=True)
+                    train_proc = subprocess.CompletedProcess(args=["llm_patch"], returncode=1)
+                    train_suggestion = "crash"
+                elif hyperopt_returncode is not None and hyperopt_returncode != 0:
+                    print(f"[{i:03d}] hyperopt crash (rc={hyperopt_returncode})", flush=True)
+                    train_proc = subprocess.CompletedProcess(args=["hyperopt"], returncode=hyperopt_returncode)
+                    train_suggestion = "crash"
+                else:
+                    if before_space is not None:
+                        print(
+                            f"[{i:03d}] train {candidate_id} {desc} within {before_space[0]}..{before_space[1]}",
+                            flush=True,
+                        )
+                    else:
+                        print(f"[{i:03d}] train {candidate_id} {desc}", flush=True)
+                    train_proc = run_backtest_runner(
                         repo_dir=repo_dir,
                         freqtrade_dir=freqtrade_dir,
                         config=args.config,
@@ -758,22 +1107,51 @@ def main() -> int:
                         strategy_path=args.strategy_path,
                         freqaimodel=args.freqaimodel,
                         freqaimodel_path=args.freqaimodel_path,
-                        timerange=args.holdout_timerange,
-                        description=f"{desc} [holdout]",
+                        timerange=args.train_timerange,
+                        description=f"{desc} [train]",
                         results_tsv=results_tsv,
                         dd_penalty=args.dd_penalty,
                         min_improvement=args.min_improvement,
                         campaign_id=args.campaign_id,
                         candidate_id=candidate_id,
-                        stage="holdout",
+                        stage="train",
                         min_profit_pct=args.min_profit_pct,
                         max_drawdown_pct=args.max_drawdown_pct,
                         min_sharpe=args.min_sharpe,
                         pair_min_trades_floor=args.pair_min_trades_floor,
                         pair_min_trades_mode=args.pair_min_trades_mode,
                     )
-                    holdout_row = read_last_matching_row(results_tsv, args.campaign_id, candidate_id, "holdout") or {}
-                    holdout_suggestion = holdout_row.get("suggestion", "crash") if holdout_proc.returncode == 0 else "crash"
+
+                    train_row = read_last_matching_row(results_tsv, args.campaign_id, candidate_id, "train") or {}
+                    train_suggestion = train_row.get("suggestion", "crash") if train_proc.returncode == 0 else "crash"
+
+                    if train_proc.returncode == 0 and train_suggestion == "keep":
+                        print(f"[{i:03d}] holdout {candidate_id} {desc}", flush=True)
+                        holdout_proc = run_backtest_runner(
+                            repo_dir=repo_dir,
+                            freqtrade_dir=freqtrade_dir,
+                            config=args.config,
+                            freqtrade_bin=args.freqtrade_bin,
+                            strategy=args.strategy,
+                            strategy_path=args.strategy_path,
+                            freqaimodel=args.freqaimodel,
+                            freqaimodel_path=args.freqaimodel_path,
+                            timerange=args.holdout_timerange,
+                            description=f"{desc} [holdout]",
+                            results_tsv=results_tsv,
+                            dd_penalty=args.dd_penalty,
+                            min_improvement=args.min_improvement,
+                            campaign_id=args.campaign_id,
+                            candidate_id=candidate_id,
+                            stage="holdout",
+                            min_profit_pct=args.min_profit_pct,
+                            max_drawdown_pct=args.max_drawdown_pct,
+                            min_sharpe=args.min_sharpe,
+                            pair_min_trades_floor=args.pair_min_trades_floor,
+                            pair_min_trades_mode=args.pair_min_trades_mode,
+                        )
+                        holdout_row = read_last_matching_row(results_tsv, args.campaign_id, candidate_id, "holdout") or {}
+                        holdout_suggestion = holdout_row.get("suggestion", "crash") if holdout_proc.returncode == 0 else "crash"
 
                 final_suggestion = choose_final_suggestion(
                     train_suggestion=train_suggestion,
@@ -783,37 +1161,50 @@ def main() -> int:
                 )
 
                 if final_suggestion == "keep":
-                    committed_text = mutated_text
-                    param_weights[param] *= args.weight_up
-                    param_state["keep_count"] = int(param_state["keep_count"]) + 1
-                    if not args.no_space_adaptation:
-                        recenter_space(param_state, proposed, args.keep_shrink, args.min_span_steps)
+                    committed_text = read_strategy_text(strategy_file)
+                    committed_param_text = read_optional_text(strategy_param_file)
+                    if args.llm_enable and committed_model_text is not None:
+                        committed_model_text = read_strategy_text(llm_model_file)
+                    if strategy_mutation_enabled and param_state is not None and param is not None and proposed is not None:
+                        param_weights[param] *= args.weight_up
+                        param_state["keep_count"] = int(param_state["keep_count"]) + 1
+                        if not args.no_space_adaptation:
+                            recenter_space(param_state, proposed, args.keep_shrink, args.min_span_steps)
                     print(f"[{i:03d}] KEEP (candidate={candidate_id})", flush=True)
                 elif final_suggestion == "discard":
                     restore_strategy(strategy_file, committed_text)
-                    param_weights[param] *= args.weight_down
-                    param_state["discard_count"] = int(param_state["discard_count"]) + 1
-                    if not args.no_space_adaptation:
-                        recenter_space(param_state, current, args.discard_expand, args.min_span_steps)
+                    restore_optional_file(strategy_param_file, committed_param_text)
+                    if args.llm_enable and committed_model_text is not None:
+                        restore_strategy(llm_model_file, committed_model_text)
+                    if strategy_mutation_enabled and param_state is not None and param is not None and current is not None:
+                        param_weights[param] *= args.weight_down
+                        param_state["discard_count"] = int(param_state["discard_count"]) + 1
+                        if not args.no_space_adaptation:
+                            recenter_space(param_state, current, args.discard_expand, args.min_span_steps)
                     print(f"[{i:03d}] DISCARD -> reverted change", flush=True)
                 else:
                     restore_strategy(strategy_file, committed_text)
-                    param_weights[param] *= args.weight_crash
-                    param_state["crash_count"] = int(param_state["crash_count"]) + 1
-                    if not args.no_space_adaptation:
-                        recenter_space(param_state, current, args.crash_expand, args.min_span_steps)
+                    restore_optional_file(strategy_param_file, committed_param_text)
+                    if args.llm_enable and committed_model_text is not None:
+                        restore_strategy(llm_model_file, committed_model_text)
+                    if strategy_mutation_enabled and param_state is not None and param is not None and current is not None:
+                        param_weights[param] *= args.weight_crash
+                        param_state["crash_count"] = int(param_state["crash_count"]) + 1
+                        if not args.no_space_adaptation:
+                            recenter_space(param_state, current, args.crash_expand, args.min_span_steps)
                     print(f"[{i:03d}] CRASH -> reverted change", flush=True)
 
-                for name in param_weights:
-                    param_weights[name] = min(max(param_weights[name], 0.05), 20.0)
-                    space_state["params"][name]["weight"] = float(param_weights[name])
+                if strategy_mutation_enabled:
+                    for name in param_weights:
+                        param_weights[name] = min(max(param_weights[name], 0.05), 20.0)
+                        space_state["params"][name]["weight"] = float(param_weights[name])
+                    if param_state is not None:
+                        after_space = [float(param_state["active_min"]), float(param_state["active_max"])]
+                    if not args.no_space_adaptation:
+                        adapted_profile = build_adapted_profile(profile, space_state)
+                        _atomic_write_json(save_profile_path, adapted_profile)
 
-                after_space = [float(param_state["active_min"]), float(param_state["active_max"])]
                 save_space_state(space_state_path, space_state)
-
-                if not args.no_space_adaptation:
-                    adapted_profile = build_adapted_profile(profile, space_state)
-                    _atomic_write_json(save_profile_path, adapted_profile)
 
                 review_record = {
                     "iteration": i,
@@ -825,6 +1216,15 @@ def main() -> int:
                     "to": proposed,
                     "space_before": before_space,
                     "space_after": after_space,
+                    "llm": llm_info,
+                    "hyperopt": {
+                        "ran": hyperopt_ran,
+                        "returncode": hyperopt_returncode,
+                        "cadence": args.hyperopt_cadence,
+                        "epochs": args.hyperopt_epochs,
+                        "spaces": args.hyperopt_spaces,
+                        "loss": args.hyperopt_loss,
+                    },
                     "train": {
                         "status": train_row.get("status"),
                         "suggestion": train_row.get("suggestion"),
@@ -840,7 +1240,7 @@ def main() -> int:
                     if holdout_row
                     else None,
                     "final_suggestion": final_suggestion,
-                    "param_weight": float(param_weights[param]),
+                    "param_weight": float(param_weights[param]) if (param and param in param_weights) else None,
                     "description": desc,
                 }
                 with review_log.open("a", encoding="utf-8") as f:
@@ -852,6 +1252,9 @@ def main() -> int:
                 print(f"Adapted profile saved: {save_profile_path}", flush=True)
 
             restore_strategy(strategy_file, committed_text)
+            restore_optional_file(strategy_param_file, committed_param_text)
+            if args.llm_enable and committed_model_text is not None:
+                restore_strategy(llm_model_file, committed_model_text)
             save_space_state(space_state_path, space_state)
 
     except RuntimeError as exc:
@@ -862,14 +1265,18 @@ def main() -> int:
             # Best-effort restore after interrupt.
             if "strategy_file" in locals() and "committed_text" in locals():
                 restore_strategy(strategy_file, committed_text)
+            if "strategy_param_file" in locals() and "committed_param_text" in locals():
+                restore_optional_file(strategy_param_file, committed_param_text)
+            if "llm_model_file" in locals() and "committed_model_text" in locals() and committed_model_text is not None:
+                restore_strategy(llm_model_file, committed_model_text)
             if "space_state_path" in locals() and "space_state" in locals():
                 save_space_state(space_state_path, space_state)
         finally:
             signame = interrupted["signal"]
             if signame is None:
-                print("Interrupted. Restored strategy and saved state.", flush=True)
+                print("Interrupted. Restored strategy/model files and saved state.", flush=True)
             else:
-                print(f"Interrupted by signal {signame}. Restored strategy and saved state.", flush=True)
+                print(f"Interrupted by signal {signame}. Restored strategy/model files and saved state.", flush=True)
         return 130
     finally:
         signal.signal(signal.SIGINT, old_sigint)
