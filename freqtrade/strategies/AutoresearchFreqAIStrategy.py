@@ -26,14 +26,14 @@ class AutoresearchFreqAIStrategy(IStrategy):
     desired_leverage = 1.0
 
     # Conservative starter thresholds (predicted future return).
-    long_entry_ret = 0.004
+    long_entry_ret = 0.011
     long_exit_ret = -0.001
-    short_entry_ret = -0.004
+    short_entry_ret = -0.005
     short_exit_ret = 0.001
-    long_prob_min = 0.55
-    short_prob_max = 0.45
-    long_exit_prob_max = 0.48
-    short_exit_prob_min = 0.52
+    long_prob_min = 0.58
+    short_prob_max = 0.44
+    long_exit_prob_max = 0.4
+    short_exit_prob_min = 0.54
 
     minimal_roi = {
         "0": 0.02,

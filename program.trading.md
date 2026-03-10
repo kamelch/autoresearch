@@ -86,6 +86,9 @@ python3 scripts/automate_freqai_pipeline.py \
   --iterations 30
 ```
 
+If `freqtrade` is not in PATH, add:
+`--freqtrade-bin /path/to/your/freqtrade/.venv/bin/freqtrade`
+
 ## Decision policy
 
 - Keep only changes that improve score by a meaningful margin.
