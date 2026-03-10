@@ -1,0 +1,2 @@
+{"iteration": 1, "timestamp": "2026-03-10T15:36:01.693139+00:00", "param": "long_exit_prob_max", "from": 0.48, "to": 0.45, "suggestion": "crash", "status": "ok", "score": null, "param_weight": 0.75, "description": "long_exit_prob_max: 0.48 -> 0.45"}
+{"iteration": 2, "timestamp": "2026-03-10T15:36:09.992801+00:00", "param": "short_exit_prob_min", "from": 0.52, "to": 0.5, "suggestion": "crash", "status": "ok", "score": null, "param_weight": 0.75, "description": "short_exit_prob_min: 0.52 -> 0.5"}

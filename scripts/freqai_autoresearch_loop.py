@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Autoresearch-style loop for FreqAI strategy optimization.
-
-This script:
-- mutates strategy class parameters (one change per iteration)
-- runs one backtest via scripts/run_freqtrade_backtest.py
-- reads keep/discard/crash suggestion from results.tsv
-- keeps winning edits and auto-reverts losers
-"""
+"""Autoresearch loop for FreqAI strategy tuning (campaign-isolated v2)."""
 
 from __future__ import annotations
 
@@ -17,9 +10,12 @@ import json
 import pathlib
 import random
 import re
+import signal
 import subprocess
 import sys
 from typing import Any
+
+from autoresearch_utils import exclusive_lock, profile_fingerprint
 
 
 NUM_RE = r"[-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?"
@@ -41,6 +37,68 @@ def to_float(value: Any) -> float | None:
     return None
 
 
+def decimals_for_step(step: float) -> int:
+    txt = f"{step:.12f}".rstrip("0").rstrip(".")
+    if "." not in txt:
+        return 0
+    return len(txt.split(".", 1)[1])
+
+
+def quantize(value: float, step: float, decimals: int) -> float:
+    return round(round(value / step) * step, decimals)
+
+
+def clip(v: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, v))
+
+
+def sanitize_range(lo: float, hi: float, hard_min: float, hard_max: float, step: float) -> tuple[float, float]:
+    decimals = decimals_for_step(step)
+    lo = quantize(clip(lo, hard_min, hard_max), step, decimals)
+    hi = quantize(clip(hi, hard_min, hard_max), step, decimals)
+    if hi <= lo:
+        if lo + step <= hard_max:
+            hi = quantize(lo + step, step, decimals)
+        elif hi - step >= hard_min:
+            lo = quantize(hi - step, step, decimals)
+        else:
+            lo = quantize(hard_min, step, decimals)
+            hi = quantize(hard_max, step, decimals)
+    return lo, hi
+
+
+def normalize_tunable_spec(name: str, raw: dict[str, Any]) -> dict[str, float]:
+    if not isinstance(raw, dict):
+        raise ValueError(f"Tunable '{name}' must be an object.")
+    if "min" not in raw or "max" not in raw or "step" not in raw:
+        raise ValueError(f"Tunable '{name}' must contain min/max/step.")
+
+    step = float(raw["step"])
+    if step <= 0:
+        raise ValueError(f"Tunable '{name}' has non-positive step: {step}")
+
+    cur_min = float(raw["min"])
+    cur_max = float(raw["max"])
+    if cur_max <= cur_min:
+        raise ValueError(f"Tunable '{name}' has invalid range min={cur_min}, max={cur_max}")
+
+    hard_min = float(raw.get("hard_min", cur_min))
+    hard_max = float(raw.get("hard_max", cur_max))
+    hard_min = min(hard_min, cur_min)
+    hard_max = max(hard_max, cur_max)
+    if hard_max <= hard_min:
+        raise ValueError(f"Tunable '{name}' has invalid hard bounds {hard_min}..{hard_max}")
+
+    cur_min, cur_max = sanitize_range(cur_min, cur_max, hard_min, hard_max, step)
+    return {
+        "min": cur_min,
+        "max": cur_max,
+        "step": step,
+        "hard_min": hard_min,
+        "hard_max": hard_max,
+    }
+
+
 def load_profile(path: pathlib.Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         data = json.load(f)
@@ -48,6 +106,12 @@ def load_profile(path: pathlib.Path) -> dict[str, Any]:
         raise ValueError("Profile must contain 'strategy_file' and 'tunables'.")
     if not isinstance(data["tunables"], dict) or not data["tunables"]:
         raise ValueError("'tunables' must be a non-empty object.")
+
+    normalized: dict[str, dict[str, float]] = {}
+    for name, spec in data["tunables"].items():
+        normalized[name] = normalize_tunable_spec(name, spec)
+
+    data["_normalized_tunables"] = normalized
     return data
 
 
@@ -65,35 +129,17 @@ def parse_value(text: str, name: str) -> float:
     return float(m.group("val"))
 
 
-def decimals_for_step(step: float) -> int:
-    txt = f"{step:.12f}".rstrip("0").rstrip(".")
-    if "." not in txt:
-        return 0
-    return len(txt.split(".", 1)[1])
-
-
-def quantize(value: float, step: float, decimals: int) -> float:
-    q = round(round(value / step) * step, decimals)
-    return q
-
-
-def clip(v: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, v))
-
-
 def mutate_value(current: float, spec: dict[str, Any], rng: random.Random) -> float:
     lo = float(spec["min"])
     hi = float(spec["max"])
     step = float(spec["step"])
     decimals = decimals_for_step(step)
 
-    # Random step jump around current value.
     jump = rng.choice([-3, -2, -1, 1, 2, 3]) * step
     candidate = clip(current + jump, lo, hi)
     candidate = quantize(candidate, step, decimals)
 
     if candidate == current:
-        # Fallback: random value on grid within bounds.
         span = int(round((hi - lo) / step))
         idx = rng.randint(0, max(span, 0))
         candidate = quantize(lo + idx * step, step, decimals)
@@ -128,62 +174,52 @@ def replace_assignment(text: str, name: str, new_value: float) -> str:
         val_token = f"{new_value:.{decimals}f}"
     else:
         val_token = str(int(round(new_value)))
-    return text[:m.start()] + f"{m.group('prefix')}{val_token}{m.group('suffix')}" + text[m.end():]
-
-
-def read_last_row(tsv_path: pathlib.Path) -> dict[str, str] | None:
-    if not tsv_path.exists() or tsv_path.stat().st_size == 0:
-        return None
-    with tsv_path.open("r", encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f, delimiter="\t")
-        last = None
-        for row in reader:
-            last = row
-        return last
+    return text[: m.start()] + f"{m.group('prefix')}{val_token}{m.group('suffix')}" + text[m.end() :]
 
 
 def enforce_consistency(text: str) -> str:
-    # Keep probability gate ordering sane.
     lp = parse_value(text, "long_prob_min")
     sp = parse_value(text, "short_prob_max")
     le = parse_value(text, "long_exit_prob_max")
     se = parse_value(text, "short_exit_prob_min")
 
-    changed = False
-
-    # short entry probability should be <= long entry probability.
     if sp >= lp:
         sp = max(0.0, lp - 0.01)
         text = replace_assignment(text, "short_prob_max", sp)
-        changed = True
 
-    # Long exit probability should not exceed long entry threshold.
     if le >= lp:
         le = max(0.0, lp - 0.01)
         text = replace_assignment(text, "long_exit_prob_max", le)
-        changed = True
 
-    # Short exit probability should not be below short entry threshold.
     if se <= sp:
         se = min(1.0, sp + 0.01)
         text = replace_assignment(text, "short_exit_prob_min", se)
-        changed = True
 
-    return text if changed else text
+    return text
 
 
 def run_backtest_runner(
     repo_dir: pathlib.Path,
     freqtrade_dir: pathlib.Path,
     config: str,
+    freqtrade_bin: str | None,
     strategy: str,
     strategy_path: str | None,
     freqaimodel: str | None,
+    freqaimodel_path: str | None,
     timerange: str,
     description: str,
     results_tsv: pathlib.Path,
     dd_penalty: float,
     min_improvement: float,
+    campaign_id: str,
+    candidate_id: str,
+    stage: str,
+    min_profit_pct: float,
+    max_drawdown_pct: float,
+    min_sharpe: float,
+    pair_min_trades_floor: int,
+    pair_min_trades_mode: str,
 ) -> subprocess.CompletedProcess[str]:
     runner = repo_dir / "scripts" / "run_freqtrade_backtest.py"
     cmd = [
@@ -207,35 +243,308 @@ def run_backtest_runner(
         str(dd_penalty),
         "--min-improvement",
         str(min_improvement),
+        "--campaign-id",
+        campaign_id,
+        "--candidate-id",
+        candidate_id,
+        "--stage",
+        stage,
+        "--min-profit-pct",
+        str(min_profit_pct),
+        "--max-drawdown-pct",
+        str(max_drawdown_pct),
+        "--min-sharpe",
+        str(min_sharpe),
+        "--pair-min-trades-floor",
+        str(pair_min_trades_floor),
+        "--pair-min-trades-mode",
+        pair_min_trades_mode,
     ]
     if strategy_path:
         cmd.extend(["--strategy-path", strategy_path])
     if freqaimodel:
         cmd.extend(["--freqaimodel", freqaimodel])
+    if freqaimodel_path:
+        cmd.extend(["--freqaimodel-path", freqaimodel_path])
+    if freqtrade_bin:
+        cmd.extend(["--freqtrade-bin", freqtrade_bin])
 
-    return subprocess.run(cmd, text=True, cwd=repo_dir, capture_output=True)
+    return subprocess.run(cmd, text=True, cwd=repo_dir)
 
 
-def main() -> int:
+def _atomic_write_json(path: pathlib.Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp_path.replace(path)
+
+
+def init_space_state(
+    tunables: dict[str, dict[str, float]],
+    profile_raw: dict[str, Any],
+    campaign_id: str,
+    profile_path: pathlib.Path,
+    profile_hash: str,
+) -> dict[str, Any]:
+    params: dict[str, dict[str, float | int]] = {}
+    for name, spec in tunables.items():
+        raw_spec = profile_raw["tunables"].get(name, {})
+        params[name] = {
+            "hard_min": float(spec["hard_min"]),
+            "hard_max": float(spec["hard_max"]),
+            "active_min": float(spec["min"]),
+            "active_max": float(spec["max"]),
+            "step": float(spec["step"]),
+            "weight": float(raw_spec.get("weight", 1.0)),
+            "keep_count": 0,
+            "discard_count": 0,
+            "crash_count": 0,
+        }
+    return {
+        "version": 2,
+        "campaign_id": campaign_id,
+        "profile_hash": profile_hash,
+        "profile_path": str(profile_path),
+        "params": params,
+    }
+
+
+def _merge_loaded_params(
+    state: dict[str, Any],
+    loaded: dict[str, Any],
+    tunables: dict[str, dict[str, float]],
+    profile_raw: dict[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(loaded, dict) or not isinstance(loaded.get("params"), dict):
+        return state
+
+    for name, spec in tunables.items():
+        item = loaded["params"].get(name)
+        if not isinstance(item, dict):
+            continue
+        hard_min = float(spec["hard_min"])
+        hard_max = float(spec["hard_max"])
+        step = float(spec["step"])
+        active_min = to_float(item.get("active_min"))
+        active_max = to_float(item.get("active_max"))
+        if active_min is None or active_max is None:
+            active_min = float(spec["min"])
+            active_max = float(spec["max"])
+        active_min, active_max = sanitize_range(active_min, active_max, hard_min, hard_max, step)
+        state["params"][name].update(
+            {
+                "hard_min": hard_min,
+                "hard_max": hard_max,
+                "active_min": active_min,
+                "active_max": active_max,
+                "step": step,
+                "weight": max(0.05, min(20.0, float(to_float(item.get("weight")) or 1.0))),
+                "keep_count": int(to_float(item.get("keep_count")) or 0),
+                "discard_count": int(to_float(item.get("discard_count")) or 0),
+                "crash_count": int(to_float(item.get("crash_count")) or 0),
+            }
+        )
+
+    return state
+
+
+def load_or_init_space_state(
+    path: pathlib.Path,
+    tunables: dict[str, dict[str, float]],
+    profile_raw: dict[str, Any],
+    campaign_id: str,
+    profile_path: pathlib.Path,
+    profile_hash: str,
+    reuse_space_state: bool,
+    reset_space_state: bool,
+) -> tuple[dict[str, Any], str]:
+    fresh = init_space_state(tunables, profile_raw, campaign_id, profile_path, profile_hash)
+
+    if reset_space_state:
+        return fresh, "reset_requested"
+    if not path.exists():
+        return fresh, "new_state"
+
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return fresh, "invalid_json"
+
+    loaded_campaign = loaded.get("campaign_id")
+    loaded_profile_hash = loaded.get("profile_hash")
+    loaded_profile_path = loaded.get("profile_path")
+
+    mismatch = (
+        loaded_campaign != campaign_id
+        or loaded_profile_hash != profile_hash
+        or str(loaded_profile_path) != str(profile_path)
+    )
+
+    if mismatch and not reuse_space_state:
+        return fresh, "metadata_mismatch_reset"
+
+    merged = _merge_loaded_params(fresh, loaded, tunables, profile_raw)
+    return merged, "reused_state" if not mismatch else "metadata_mismatch_reused"
+
+
+def save_space_state(path: pathlib.Path, state: dict[str, Any]) -> None:
+    payload = dict(state)
+    payload["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
+    _atomic_write_json(path, payload)
+
+
+def build_adapted_profile(base_profile: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+    out = {
+        "strategy_file": base_profile["strategy_file"],
+        "tunables": {},
+    }
+    for name, raw in base_profile["tunables"].items():
+        param_state = state["params"][name]
+        merged = dict(raw)
+        merged["min"] = float(param_state["active_min"])
+        merged["max"] = float(param_state["active_max"])
+        merged["step"] = float(param_state["step"])
+        merged["hard_min"] = float(param_state["hard_min"])
+        merged["hard_max"] = float(param_state["hard_max"])
+        merged["weight"] = float(param_state["weight"])
+        out["tunables"][name] = merged
+    return out
+
+
+def ensure_current_inside_space(param_state: dict[str, Any], current: float) -> None:
+    hard_min = float(param_state["hard_min"])
+    hard_max = float(param_state["hard_max"])
+    step = float(param_state["step"])
+    lo = min(float(param_state["active_min"]), current)
+    hi = max(float(param_state["active_max"]), current)
+    lo, hi = sanitize_range(lo, hi, hard_min, hard_max, step)
+    param_state["active_min"] = lo
+    param_state["active_max"] = hi
+
+
+def recenter_space(param_state: dict[str, Any], center: float, scale: float, min_span_steps: int) -> None:
+    hard_min = float(param_state["hard_min"])
+    hard_max = float(param_state["hard_max"])
+    step = float(param_state["step"])
+    hard_span = hard_max - hard_min
+    if hard_span <= 0:
+        return
+
+    cur_span = max(float(param_state["active_max"]) - float(param_state["active_min"]), step)
+    target_span = max(step * float(min_span_steps), cur_span * scale)
+    target_span = min(target_span, hard_span)
+    lo = center - target_span / 2.0
+    hi = center + target_span / 2.0
+    lo, hi = sanitize_range(lo, hi, hard_min, hard_max, step)
+    param_state["active_min"] = lo
+    param_state["active_max"] = hi
+
+
+def read_last_matching_row(
+    tsv_path: pathlib.Path,
+    campaign_id: str,
+    candidate_id: str,
+    stage: str,
+) -> dict[str, str] | None:
+    if not tsv_path.exists() or tsv_path.stat().st_size == 0:
+        return None
+    with tsv_path.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        last = None
+        for row in reader:
+            if row.get("campaign_id") != campaign_id:
+                continue
+            if row.get("candidate_id") != candidate_id:
+                continue
+            if row.get("stage") != stage:
+                continue
+            last = row
+        return last
+
+
+def has_campaign_rows(tsv_path: pathlib.Path, campaign_id: str) -> bool:
+    if not tsv_path.exists() or tsv_path.stat().st_size == 0:
+        return False
+    with tsv_path.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            if row.get("campaign_id") == campaign_id:
+                return True
+    return False
+
+
+def choose_final_suggestion(
+    train_suggestion: str,
+    holdout_suggestion: str | None,
+    train_returncode: int,
+    holdout_returncode: int | None,
+) -> str:
+    if train_returncode != 0:
+        return "crash"
+    if train_suggestion != "keep":
+        return train_suggestion or "discard"
+    if holdout_returncode is None:
+        return "crash"
+    if holdout_returncode != 0:
+        return "crash"
+    return holdout_suggestion or "discard"
+
+
+def restore_strategy(strategy_file: pathlib.Path, text: str) -> None:
+    strategy_file.write_text(text, encoding="utf-8")
+
+
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Autoresearch loop for FreqAI strategy tuning")
     parser.add_argument("--freqtrade-dir", required=True, help="Path to Freqtrade project")
     parser.add_argument("--config", required=True, help="Freqtrade config path (as seen from freqtrade-dir)")
+    parser.add_argument("--freqtrade-bin", default=None, help="Freqtrade executable (or command), e.g. /path/.venv/bin/freqtrade")
     parser.add_argument("--strategy", default="AutoresearchFreqAIStrategy", help="Strategy class name")
     parser.add_argument("--strategy-path", default=None, help="Strategy path for freqtrade")
-    parser.add_argument("--freqaimodel", default="PyTorchMLPRegressor", help="FreqAI model class")
-    parser.add_argument("--timerange", required=True, help="Backtest timerange")
+    parser.add_argument("--freqaimodel", default="AutoresearchLSTMRegressor", help="FreqAI model class")
+    parser.add_argument("--freqaimodel-path", default=None, help="Optional lookup path for custom FreqAI models")
+    parser.add_argument("--train-timerange", required=True, help="Training/optimization timerange")
+    parser.add_argument("--holdout-timerange", required=True, help="Holdout validation timerange")
     parser.add_argument("--iterations", type=int, default=20, help="Number of experiments to run")
     parser.add_argument("--seed", type=int, default=42, help="PRNG seed")
     parser.add_argument("--profile", default="freqtrade/autoresearch_profile.example.json", help="Mutation profile JSON")
+    parser.add_argument("--save-profile", default=None, help="Write adapted profile for next runs")
+    parser.add_argument("--space-state", default=None, help="Adaptive space state JSON path")
+    parser.add_argument("--campaign-id", default="default", help="Campaign identifier")
+    parser.add_argument("--reuse-space-state", action="store_true", help="Allow metadata-mismatched state reuse")
+    parser.add_argument("--reset-space-state", action="store_true", help="Reset state before run")
+    parser.add_argument("--lock-file", default=None, help="Lock file path (default: campaign-scoped in freqtrade/runs)")
+
+    parser.add_argument("--no-space-adaptation", action="store_true", help="Disable automatic search-space adaptation")
+    parser.add_argument("--keep-shrink", type=float, default=0.85, help="Range scale after keep (<1 shrinks)")
+    parser.add_argument("--discard-expand", type=float, default=1.10, help="Range scale after discard (>1 expands)")
+    parser.add_argument("--crash-expand", type=float, default=1.25, help="Range scale after crash (>1 expands)")
+    parser.add_argument("--min-span-steps", type=int, default=6, help="Minimum active range width in step units")
     parser.add_argument("--repo-dir", default=None, help="Repo root of this project")
     parser.add_argument("--results-tsv", default=None, help="TSV results file path")
     parser.add_argument("--dd-penalty", type=float, default=0.5, help="Score penalty on drawdown")
     parser.add_argument("--min-improvement", type=float, default=0.0, help="Required score improvement to keep")
-    parser.add_argument("--baseline-if-empty", action="store_true", help="Run one baseline first if results TSV has no rows")
+    parser.add_argument("--baseline-if-empty", action="store_true", help="Run baseline train+holdout if campaign has no rows")
     parser.add_argument("--weight-up", type=float, default=1.2, help="Multiplier for parameter weight after keep")
     parser.add_argument("--weight-down", type=float, default=0.9, help="Multiplier for parameter weight after discard")
     parser.add_argument("--weight-crash", type=float, default=0.75, help="Multiplier for parameter weight after crash")
     parser.add_argument("--review-log", default=None, help="Optional JSONL file for per-iteration review records")
+
+    parser.add_argument("--min-profit-pct", type=float, default=0.0, help="Absolute gate: minimum total profit %%")
+    parser.add_argument("--max-drawdown-pct", type=float, default=12.0, help="Absolute gate: maximum drawdown %%")
+    parser.add_argument("--min-sharpe", type=float, default=0.0, help="Absolute gate: minimum Sharpe")
+    parser.add_argument("--pair-min-trades-floor", type=int, default=10, help="Floor for pair-coverage min trades")
+    parser.add_argument(
+        "--pair-min-trades-mode",
+        default="dynamic",
+        choices=["dynamic", "off"],
+        help="Pair-coverage mode (dynamic/off)",
+    )
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
     args = parser.parse_args()
 
     repo_dir = pathlib.Path(args.repo_dir).expanduser().resolve() if args.repo_dir else pathlib.Path(__file__).resolve().parents[1]
@@ -243,125 +552,329 @@ def main() -> int:
     profile_path = pathlib.Path(args.profile).expanduser()
     if not profile_path.is_absolute():
         profile_path = (repo_dir / profile_path).resolve()
+    if not profile_path.exists():
+        raise FileNotFoundError(f"Profile file not found: {profile_path}")
 
-    results_tsv = pathlib.Path(args.results_tsv).expanduser().resolve() if args.results_tsv else (repo_dir / "freqtrade" / "results.tsv")
+    safe_strategy = re.sub(r"[^A-Za-z0-9._-]+", "_", args.strategy)
+    save_profile_path = pathlib.Path(args.save_profile).expanduser().resolve() if args.save_profile else (
+        repo_dir / "freqtrade" / f"autoresearch_profile.{args.campaign_id}.json"
+    )
+
+    space_state_path = pathlib.Path(args.space_state).expanduser().resolve() if args.space_state else (
+        repo_dir / "freqtrade" / "runs" / f"space_state_{safe_strategy}_{args.campaign_id}.json"
+    )
+
+    results_tsv = pathlib.Path(args.results_tsv).expanduser().resolve() if args.results_tsv else (
+        repo_dir / "freqtrade" / "results" / f"results_{args.campaign_id}.tsv"
+    )
+
     review_log = pathlib.Path(args.review_log).expanduser().resolve() if args.review_log else (
-        repo_dir / "freqtrade" / "runs" / f"review_{dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
+        repo_dir
+        / "freqtrade"
+        / "runs"
+        / f"review_{args.campaign_id}_{dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
     )
     review_log.parent.mkdir(parents=True, exist_ok=True)
 
+    lock_path = pathlib.Path(args.lock_file).expanduser().resolve() if args.lock_file else (
+        repo_dir / "freqtrade" / "runs" / f"lock_{safe_strategy}_{args.campaign_id}.lock"
+    )
+
+    if args.keep_shrink <= 0 or args.discard_expand <= 0 or args.crash_expand <= 0:
+        raise ValueError("Space adaptation scales must be > 0.")
+    if args.min_span_steps < 1:
+        raise ValueError("--min-span-steps must be >= 1.")
+
     rng = random.Random(args.seed)
     profile = load_profile(profile_path)
+    profile_hash = profile_fingerprint(profile)
+    tunables: dict[str, dict[str, float]] = profile["_normalized_tunables"]
 
     strategy_file = pathlib.Path(profile["strategy_file"])
     if not strategy_file.is_absolute():
         strategy_file = (repo_dir / strategy_file).resolve()
-    tunables = profile["tunables"]
-    param_weights = {name: 1.0 for name in tunables}
 
-    base_text = read_strategy_text(strategy_file)
+    interrupted = {"signal": None}
 
-    def print_proc(proc: subprocess.CompletedProcess[str]) -> None:
-        if proc.stdout.strip():
-            print(proc.stdout.rstrip())
-        if proc.stderr.strip():
-            print("[stderr]")
-            print(proc.stderr.rstrip())
+    def _signal_handler(signum: int, _frame: Any) -> None:
+        interrupted["signal"] = signum
+        raise KeyboardInterrupt()
 
-    # Optional baseline for empty results file.
-    last_row = read_last_row(results_tsv)
-    if args.baseline_if_empty and last_row is None:
-        print("Running baseline...")
-        proc = run_backtest_runner(
-            repo_dir=repo_dir,
-            freqtrade_dir=freqtrade_dir,
-            config=args.config,
-            strategy=args.strategy,
-            strategy_path=args.strategy_path,
-            freqaimodel=args.freqaimodel,
-            timerange=args.timerange,
-            description="baseline",
-            results_tsv=results_tsv,
-            dd_penalty=args.dd_penalty,
-            min_improvement=args.min_improvement,
-        )
-        print_proc(proc)
-        if proc.returncode != 0:
-            print("Baseline failed. Stopping.")
-            return proc.returncode
-        last_row = read_last_row(results_tsv)
+    old_sigint = signal.getsignal(signal.SIGINT)
+    old_sigterm = signal.getsignal(signal.SIGTERM)
 
-    for i in range(1, args.iterations + 1):
-        current_text = read_strategy_text(strategy_file)
+    try:
+        with exclusive_lock(lock_path):
+            signal.signal(signal.SIGINT, _signal_handler)
+            signal.signal(signal.SIGTERM, _signal_handler)
 
-        # AI-style adaptive choice: bias toward parameters with better historical impact.
-        param = weighted_choice(param_weights, rng)
-        spec = tunables[param]
-        current = parse_value(current_text, param)
-        proposed = mutate_value(current, spec, rng)
-        if proposed == current:
-            print(f"[{i:03d}] skip {param}: no mutation possible")
-            continue
+            space_state, state_reason = load_or_init_space_state(
+                path=space_state_path,
+                tunables=tunables,
+                profile_raw=profile,
+                campaign_id=args.campaign_id,
+                profile_path=profile_path,
+                profile_hash=profile_hash,
+                reuse_space_state=args.reuse_space_state,
+                reset_space_state=args.reset_space_state,
+            )
+            print(f"Space state: {state_reason} ({space_state_path})", flush=True)
 
-        mutated_text = replace_assignment(current_text, param, proposed)
-        mutated_text = enforce_consistency(mutated_text)
-        strategy_file.write_text(mutated_text, encoding="utf-8")
+            param_weights = {name: float(space_state["params"][name]["weight"]) for name in tunables}
+            save_space_state(space_state_path, space_state)
+            if not args.no_space_adaptation:
+                adapted_profile = build_adapted_profile(profile, space_state)
+                _atomic_write_json(save_profile_path, adapted_profile)
 
-        desc = f"{param}: {current} -> {proposed}"
-        print(f"[{i:03d}] testing {desc}")
+            committed_text = read_strategy_text(strategy_file)
 
-        proc = run_backtest_runner(
-            repo_dir=repo_dir,
-            freqtrade_dir=freqtrade_dir,
-            config=args.config,
-            strategy=args.strategy,
-            strategy_path=args.strategy_path,
-            freqaimodel=args.freqaimodel,
-            timerange=args.timerange,
-            description=desc,
-            results_tsv=results_tsv,
-            dd_penalty=args.dd_penalty,
-            min_improvement=args.min_improvement,
-        )
-        print_proc(proc)
+            if args.baseline_if_empty and not has_campaign_rows(results_tsv, args.campaign_id):
+                baseline_candidate = "baseline"
+                print("Running baseline train stage...", flush=True)
+                train_proc = run_backtest_runner(
+                    repo_dir=repo_dir,
+                    freqtrade_dir=freqtrade_dir,
+                    config=args.config,
+                    freqtrade_bin=args.freqtrade_bin,
+                    strategy=args.strategy,
+                    strategy_path=args.strategy_path,
+                    freqaimodel=args.freqaimodel,
+                    freqaimodel_path=args.freqaimodel_path,
+                    timerange=args.train_timerange,
+                    description="baseline-train",
+                    results_tsv=results_tsv,
+                    dd_penalty=args.dd_penalty,
+                    min_improvement=args.min_improvement,
+                    campaign_id=args.campaign_id,
+                    candidate_id=baseline_candidate,
+                    stage="train",
+                    min_profit_pct=args.min_profit_pct,
+                    max_drawdown_pct=args.max_drawdown_pct,
+                    min_sharpe=args.min_sharpe,
+                    pair_min_trades_floor=args.pair_min_trades_floor,
+                    pair_min_trades_mode=args.pair_min_trades_mode,
+                )
+                if train_proc.returncode != 0:
+                    print("Baseline train failed. Stopping.", flush=True)
+                    return train_proc.returncode
+                train_row = read_last_matching_row(results_tsv, args.campaign_id, baseline_candidate, "train") or {}
+                if train_row.get("suggestion") == "keep":
+                    print("Running baseline holdout stage...", flush=True)
+                    holdout_proc = run_backtest_runner(
+                        repo_dir=repo_dir,
+                        freqtrade_dir=freqtrade_dir,
+                        config=args.config,
+                        freqtrade_bin=args.freqtrade_bin,
+                        strategy=args.strategy,
+                        strategy_path=args.strategy_path,
+                        freqaimodel=args.freqaimodel,
+                        freqaimodel_path=args.freqaimodel_path,
+                        timerange=args.holdout_timerange,
+                        description="baseline-holdout",
+                        results_tsv=results_tsv,
+                        dd_penalty=args.dd_penalty,
+                        min_improvement=args.min_improvement,
+                        campaign_id=args.campaign_id,
+                        candidate_id=baseline_candidate,
+                        stage="holdout",
+                        min_profit_pct=args.min_profit_pct,
+                        max_drawdown_pct=args.max_drawdown_pct,
+                        min_sharpe=args.min_sharpe,
+                        pair_min_trades_floor=args.pair_min_trades_floor,
+                        pair_min_trades_mode=args.pair_min_trades_mode,
+                    )
+                    if holdout_proc.returncode != 0:
+                        print("Baseline holdout failed. Stopping.", flush=True)
+                        return holdout_proc.returncode
 
-        row = read_last_row(results_tsv) or {}
-        suggestion = row.get("suggestion", "crash")
-        score = row.get("score", "")
+            for i in range(1, args.iterations + 1):
+                if interrupted["signal"] is not None:
+                    break
 
-        if suggestion == "keep":
-            base_text = mutated_text
-            param_weights[param] *= args.weight_up
-            print(f"[{i:03d}] KEEP (score={score or 'n/a'})")
-        elif suggestion == "discard":
-            strategy_file.write_text(base_text, encoding="utf-8")
-            param_weights[param] *= args.weight_down
-            print(f"[{i:03d}] DISCARD -> reverted change")
-        else:
-            strategy_file.write_text(base_text, encoding="utf-8")
-            param_weights[param] *= args.weight_crash
-            print(f"[{i:03d}] {suggestion.upper()} -> reverted change")
+                current_text = read_strategy_text(strategy_file)
+                param = weighted_choice(param_weights, rng)
+                param_state = space_state["params"][param]
+                current = parse_value(current_text, param)
+                ensure_current_inside_space(param_state, current)
 
-        # Clamp weights to avoid collapse/explosion.
-        for name in param_weights:
-            param_weights[name] = min(max(param_weights[name], 0.05), 20.0)
+                spec = {
+                    "min": float(param_state["active_min"]),
+                    "max": float(param_state["active_max"]),
+                    "step": float(param_state["step"]),
+                }
+                proposed = mutate_value(current, spec, rng)
+                if proposed == current:
+                    print(f"[{i:03d}] skip {param}: no mutation possible", flush=True)
+                    continue
 
-        review_record = {
-            "iteration": i,
-            "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
-            "param": param,
-            "from": current,
-            "to": proposed,
-            "suggestion": suggestion,
-            "status": row.get("status"),
-            "score": to_float(score),
-            "param_weight": param_weights[param],
-            "description": desc,
-        }
-        with review_log.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(review_record) + "\n")
+                before_space = [float(param_state["active_min"]), float(param_state["active_max"])]
 
-    print(f"Autoresearch loop finished. Review log: {review_log}")
+                mutated_text = replace_assignment(current_text, param, proposed)
+                mutated_text = enforce_consistency(mutated_text)
+                strategy_file.write_text(mutated_text, encoding="utf-8")
+
+                candidate_id = f"cand_{i:04d}_{dt.datetime.now(dt.timezone.utc).strftime('%H%M%S')}"
+                desc = f"{param}: {current} -> {proposed}"
+                print(f"[{i:03d}] train {candidate_id} {desc} within {before_space[0]}..{before_space[1]}", flush=True)
+
+                train_proc = run_backtest_runner(
+                    repo_dir=repo_dir,
+                    freqtrade_dir=freqtrade_dir,
+                    config=args.config,
+                    freqtrade_bin=args.freqtrade_bin,
+                    strategy=args.strategy,
+                    strategy_path=args.strategy_path,
+                    freqaimodel=args.freqaimodel,
+                    freqaimodel_path=args.freqaimodel_path,
+                    timerange=args.train_timerange,
+                    description=f"{desc} [train]",
+                    results_tsv=results_tsv,
+                    dd_penalty=args.dd_penalty,
+                    min_improvement=args.min_improvement,
+                    campaign_id=args.campaign_id,
+                    candidate_id=candidate_id,
+                    stage="train",
+                    min_profit_pct=args.min_profit_pct,
+                    max_drawdown_pct=args.max_drawdown_pct,
+                    min_sharpe=args.min_sharpe,
+                    pair_min_trades_floor=args.pair_min_trades_floor,
+                    pair_min_trades_mode=args.pair_min_trades_mode,
+                )
+
+                train_row = read_last_matching_row(results_tsv, args.campaign_id, candidate_id, "train") or {}
+                train_suggestion = train_row.get("suggestion", "crash") if train_proc.returncode == 0 else "crash"
+
+                holdout_proc: subprocess.CompletedProcess[str] | None = None
+                holdout_row: dict[str, str] = {}
+                holdout_suggestion: str | None = None
+                if train_proc.returncode == 0 and train_suggestion == "keep":
+                    print(f"[{i:03d}] holdout {candidate_id} {desc}", flush=True)
+                    holdout_proc = run_backtest_runner(
+                        repo_dir=repo_dir,
+                        freqtrade_dir=freqtrade_dir,
+                        config=args.config,
+                        freqtrade_bin=args.freqtrade_bin,
+                        strategy=args.strategy,
+                        strategy_path=args.strategy_path,
+                        freqaimodel=args.freqaimodel,
+                        freqaimodel_path=args.freqaimodel_path,
+                        timerange=args.holdout_timerange,
+                        description=f"{desc} [holdout]",
+                        results_tsv=results_tsv,
+                        dd_penalty=args.dd_penalty,
+                        min_improvement=args.min_improvement,
+                        campaign_id=args.campaign_id,
+                        candidate_id=candidate_id,
+                        stage="holdout",
+                        min_profit_pct=args.min_profit_pct,
+                        max_drawdown_pct=args.max_drawdown_pct,
+                        min_sharpe=args.min_sharpe,
+                        pair_min_trades_floor=args.pair_min_trades_floor,
+                        pair_min_trades_mode=args.pair_min_trades_mode,
+                    )
+                    holdout_row = read_last_matching_row(results_tsv, args.campaign_id, candidate_id, "holdout") or {}
+                    holdout_suggestion = holdout_row.get("suggestion", "crash") if holdout_proc.returncode == 0 else "crash"
+
+                final_suggestion = choose_final_suggestion(
+                    train_suggestion=train_suggestion,
+                    holdout_suggestion=holdout_suggestion,
+                    train_returncode=train_proc.returncode,
+                    holdout_returncode=(holdout_proc.returncode if holdout_proc is not None else None),
+                )
+
+                if final_suggestion == "keep":
+                    committed_text = mutated_text
+                    param_weights[param] *= args.weight_up
+                    param_state["keep_count"] = int(param_state["keep_count"]) + 1
+                    if not args.no_space_adaptation:
+                        recenter_space(param_state, proposed, args.keep_shrink, args.min_span_steps)
+                    print(f"[{i:03d}] KEEP (candidate={candidate_id})", flush=True)
+                elif final_suggestion == "discard":
+                    restore_strategy(strategy_file, committed_text)
+                    param_weights[param] *= args.weight_down
+                    param_state["discard_count"] = int(param_state["discard_count"]) + 1
+                    if not args.no_space_adaptation:
+                        recenter_space(param_state, current, args.discard_expand, args.min_span_steps)
+                    print(f"[{i:03d}] DISCARD -> reverted change", flush=True)
+                else:
+                    restore_strategy(strategy_file, committed_text)
+                    param_weights[param] *= args.weight_crash
+                    param_state["crash_count"] = int(param_state["crash_count"]) + 1
+                    if not args.no_space_adaptation:
+                        recenter_space(param_state, current, args.crash_expand, args.min_span_steps)
+                    print(f"[{i:03d}] CRASH -> reverted change", flush=True)
+
+                for name in param_weights:
+                    param_weights[name] = min(max(param_weights[name], 0.05), 20.0)
+                    space_state["params"][name]["weight"] = float(param_weights[name])
+
+                after_space = [float(param_state["active_min"]), float(param_state["active_max"])]
+                save_space_state(space_state_path, space_state)
+
+                if not args.no_space_adaptation:
+                    adapted_profile = build_adapted_profile(profile, space_state)
+                    _atomic_write_json(save_profile_path, adapted_profile)
+
+                review_record = {
+                    "iteration": i,
+                    "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
+                    "campaign_id": args.campaign_id,
+                    "candidate_id": candidate_id,
+                    "param": param,
+                    "from": current,
+                    "to": proposed,
+                    "space_before": before_space,
+                    "space_after": after_space,
+                    "train": {
+                        "status": train_row.get("status"),
+                        "suggestion": train_row.get("suggestion"),
+                        "decision_reason": train_row.get("decision_reason"),
+                        "score": to_float(train_row.get("score")),
+                    },
+                    "holdout": {
+                        "status": holdout_row.get("status"),
+                        "suggestion": holdout_row.get("suggestion"),
+                        "decision_reason": holdout_row.get("decision_reason"),
+                        "score": to_float(holdout_row.get("score")),
+                    }
+                    if holdout_row
+                    else None,
+                    "final_suggestion": final_suggestion,
+                    "param_weight": float(param_weights[param]),
+                    "description": desc,
+                }
+                with review_log.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(review_record) + "\n")
+
+            print(f"Autoresearch loop finished. Review log: {review_log}", flush=True)
+            print(f"Space state saved: {space_state_path}", flush=True)
+            if not args.no_space_adaptation:
+                print(f"Adapted profile saved: {save_profile_path}", flush=True)
+
+            restore_strategy(strategy_file, committed_text)
+            save_space_state(space_state_path, space_state)
+
+    except RuntimeError as exc:
+        print(f"Lock error: {exc}", flush=True)
+        return 2
+    except KeyboardInterrupt:
+        try:
+            # Best-effort restore after interrupt.
+            if "strategy_file" in locals() and "committed_text" in locals():
+                restore_strategy(strategy_file, committed_text)
+            if "space_state_path" in locals() and "space_state" in locals():
+                save_space_state(space_state_path, space_state)
+        finally:
+            signame = interrupted["signal"]
+            if signame is None:
+                print("Interrupted. Restored strategy and saved state.", flush=True)
+            else:
+                print(f"Interrupted by signal {signame}. Restored strategy and saved state.", flush=True)
+        return 130
+    finally:
+        signal.signal(signal.SIGINT, old_sigint)
+        signal.signal(signal.SIGTERM, old_sigterm)
+
     return 0
 
 

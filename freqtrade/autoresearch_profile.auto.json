@@ -1,0 +1,61 @@
+{
+  "strategy_file": "freqtrade/strategies/AutoresearchFreqAIStrategy.py",
+  "tunables": {
+    "long_entry_ret": {
+      "hard_max": 0.02,
+      "hard_min": 0.001,
+      "max": 0.02,
+      "min": 0.001,
+      "step": 0.001,
+      "weight": 1.0
+    },
+    "long_exit_prob_max": {
+      "hard_max": 0.6,
+      "hard_min": 0.4,
+      "max": 0.6,
+      "min": 0.4,
+      "step": 0.01,
+      "weight": 1.0
+    },
+    "long_prob_min": {
+      "hard_max": 0.75,
+      "hard_min": 0.5,
+      "max": 0.75,
+      "min": 0.5,
+      "step": 0.01,
+      "weight": 1.0
+    },
+    "short_entry_ret": {
+      "hard_max": -0.001,
+      "hard_min": -0.02,
+      "max": -0.001,
+      "min": -0.02,
+      "step": 0.001,
+      "weight": 1.0
+    },
+    "short_exit_prob_min": {
+      "hard_max": 0.65,
+      "hard_min": 0.4,
+      "max": 0.64,
+      "min": 0.4,
+      "step": 0.01,
+      "weight": 0.81
+    },
+    "short_prob_max": {
+      "hard_max": 0.5,
+      "hard_min": 0.25,
+      "max": 0.5,
+      "min": 0.35,
+      "step": 0.01,
+      "weight": 0.81
+    },
+    "stoploss": {
+      "hard_max": -0.005,
+      "hard_min": -0.06,
+      "max": -0.005,
+      "min": -0.06,
+      "step": 0.001,
+      "weight": 1.0
+    }
+  }
+}

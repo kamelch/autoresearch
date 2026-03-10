@@ -1,0 +1,77 @@
+$ /Users/maryamsediqi/freqtrade/.venv/bin/freqtrade backtesting --config user_data/config_freqai_autoresearch.json --strategy AutoresearchFreqAIStrategy --timerange 20250101-20250401 --export trades --backtest-filename /Users/maryamsediqi/autoresearch/freqtrade/runs/backtest_AutoresearchFreqAIStrategy_20260310T203146Z.json --strategy-path /Users/maryamsediqi/autoresearch/freqtrade/strategies --freqaimodel AutoresearchLSTMRegressor --freqaimodel-path /Users/maryamsediqi/autoresearch/freqtrade/freqaimodels
+
+2026-03-10 21:31:47,073 - freqtrade - INFO - freqtrade 2026.2
+2026-03-10 21:31:47,493 - numexpr.utils - INFO - NumExpr defaulting to 8 threads.
+2026-03-10 21:31:48,541 - freqtrade.configuration.load_config - INFO - Using config: user_data/config_freqai_autoresearch.json ...
+2026-03-10 21:31:48,544 - freqtrade.loggers - INFO - Enabling colorized output.
+2026-03-10 21:31:48,544 - freqtrade.loggers - INFO - Logfile configured
+2026-03-10 21:31:48,544 - freqtrade.loggers - INFO - Verbosity set to 0
+2026-03-10 21:31:48,544 - freqtrade.configuration.configuration - INFO - Using additional Strategy lookup path: /Users/maryamsediqi/autoresearch/freqtrade/strategies
+2026-03-10 21:31:48,544 - freqtrade.configuration.configuration - INFO - Using max_open_trades: 2 ...
+2026-03-10 21:31:48,544 - freqtrade.configuration.configuration - INFO - Parameter --timerange detected: 20250101-20250401 ...
+2026-03-10 21:31:48,544 - freqtrade.configuration.configuration - INFO - Using user-data directory: /Users/maryamsediqi/freqtrade/user_data ...
+2026-03-10 21:31:48,545 - freqtrade.configuration.configuration - INFO - Using data directory: /Users/maryamsediqi/freqtrade/user_data/data/binance ...
+2026-03-10 21:31:48,545 - freqtrade.configuration.configuration - INFO - Storing backtest results to 
+/Users/maryamsediqi/autoresearch/freqtrade/runs/backtest_AutoresearchFreqAIStrategy_20260310T203146Z.json ...
+2026-03-10 21:31:48,545 - freqtrade.configuration.configuration - WARNING - DEPRECATED: Using `--export-filename` has no impact when backtesting. Please use `--notes` to annotate backtest results and 
+`--backtest-directory` to specify the output directory. 
+2026-03-10 21:31:48,545 - freqtrade.configuration.configuration - INFO - Parameter --export detected: trades ...
+2026-03-10 21:31:48,545 - freqtrade.configuration.configuration - INFO - Parameter --cache=day detected ...
+2026-03-10 21:31:48,546 - freqtrade.configuration.configuration - INFO - Filter trades by timerange: 20250101-20250401
+2026-03-10 21:31:48,546 - freqtrade.configuration.configuration - INFO - Using freqaimodel class name: AutoresearchLSTMRegressor
+2026-03-10 21:31:48,546 - freqtrade.configuration.configuration - INFO - Using freqaimodel path: /Users/maryamsediqi/autoresearch/freqtrade/freqaimodels
+2026-03-10 21:31:48,546 - freqtrade.exchange.check_exchange - INFO - Checking exchange...
+2026-03-10 21:31:48,550 - freqtrade.exchange.check_exchange - INFO - Exchange "binance" is officially supported by the Freqtrade development team.
+2026-03-10 21:31:48,550 - freqtrade.configuration.configuration - INFO - Using pairlist from configuration.
+2026-03-10 21:31:48,550 - freqtrade.configuration.config_validation - INFO - Validating configuration ...
+2026-03-10 21:31:48,551 - freqtrade.commands.optimize_commands - INFO - Starting freqtrade in Backtesting mode
+2026-03-10 21:31:48,552 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled
+2026-03-10 21:31:48,552 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.39
+2026-03-10 21:31:48,552 - freqtrade.exchange.exchange - INFO - Applying additional ccxt config: {'options': {'defaultType': 'swap'}}
+2026-03-10 21:31:48,555 - freqtrade.exchange.exchange - INFO - Applying additional ccxt config: {'options': {'defaultType': 'swap'}}
+2026-03-10 21:31:48,559 - freqtrade.exchange.exchange - INFO - Using Exchange "Binance"
+2026-03-10 21:31:49,811 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange 'Binance'...
+2026-03-10 21:31:49,854 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy AutoresearchFreqAIStrategy from 
+'/Users/maryamsediqi/autoresearch/freqtrade/strategies/AutoresearchFreqAIStrategy.py'...
+2026-03-10 21:31:49,855 - freqtrade.strategy.hyper - INFO - Found no parameter file.
+2026-03-10 21:31:49,855 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'timeframe' with value from the configuration: 5m.
+2026-03-10 21:31:49,855 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.
+2026-03-10 21:31:49,855 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 75.
+2026-03-10 21:31:49,855 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: 2.
+2026-03-10 21:31:49,855 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.02, '60': 0.01, '180': 0.0}
+2026-03-10 21:31:49,856 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 5m
+2026-03-10 21:31:49,856 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.02
+2026-03-10 21:31:49,856 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: False
+2026-03-10 21:31:49,856 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.0
+2026-03-10 21:31:49,856 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: False
+2026-03-10 21:31:49,856 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False
+2026-03-10 21:31:49,856 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True
+2026-03-10 21:31:49,856 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'limit', 'exit': 'limit', 'stoploss': 'limit', 'stoploss_on_exchange': False, 
+'stoploss_on_exchange_interval': 60}
+2026-03-10 21:31:49,856 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}
+2026-03-10 21:31:49,857 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT
+2026-03-10 21:31:49,857 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 75
+2026-03-10 21:31:49,857 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 240
+2026-03-10 21:31:49,857 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: True
+2026-03-10 21:31:49,857 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: False
+2026-03-10 21:31:49,857 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False
+2026-03-10 21:31:49,857 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.0
+2026-03-10 21:31:49,857 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False
+2026-03-10 21:31:49,857 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0
+2026-03-10 21:31:49,858 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False
+2026-03-10 21:31:49,858 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1
+2026-03-10 21:31:49,858 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: 2
+2026-03-10 21:31:49,858 - freqtrade.configuration.config_validation - INFO - Validating configuration ...
+2026-03-10 21:31:49,864 - freqtrade.resolvers.iresolver - INFO - Using resolved pairlist StaticPairList from '/Users/maryamsediqi/freqtrade/freqtrade/plugins/pairlist/StaticPairList.py'...
+2026-03-10 21:31:49,868 - freqtrade.optimize.backtesting - INFO - Using fee 0.0500% - worst case fee from exchange (lowest tier).
+2026-03-10 21:31:49,868 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 5m to 8880
+2026-03-10 21:31:50,053 - freqtrade.optimize.backtesting - INFO - Loading data from 2024-12-01 04:00:00 up to 2025-04-01 00:00:00 (120 days).
+2026-03-10 21:31:50,368 - freqtrade.optimize.backtesting - INFO - Dataload complete. Calculating indicators
+2026-03-10 21:31:50,371 - freqtrade.optimize.backtesting - INFO - Running backtesting for Strategy AutoresearchFreqAIStrategy
+2026-03-10 21:31:52,493 - freqtrade.resolvers.iresolver - INFO - Using resolved freqaimodel AutoresearchLSTMRegressor from 
+'/Users/maryamsediqi/autoresearch/freqtrade/freqaimodels/AutoresearchLSTMRegressor.py'...
+2026-03-10 21:31:52,494 - freqtrade.freqai.data_drawer - INFO - Could not find existing datadrawer, starting from scratch
+2026-03-10 21:31:52,494 - freqtrade.freqai.data_drawer - INFO - Could not find existing historic_predictions, starting from scratch
+2026-03-10 21:31:52,494 - freqtrade.freqai.freqai_interface - INFO - Set fresh train queue from whitelist. Queue: ['BTC/USDT:USDT', 'ETH/USDT:USDT']
+2026-03-10 21:31:52,601 - freqtrade - ERROR - AutoresearchLSTMRegressor requires freqai.conv_width >= 2. Current conv_width=1.
+

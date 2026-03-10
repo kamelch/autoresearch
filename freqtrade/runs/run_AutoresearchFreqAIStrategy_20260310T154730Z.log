@@ -1,0 +1,333 @@
+$ /Users/maryamsediqi/freqtrade/.venv/bin/freqtrade backtesting --config user_data/config_freqai_autoresearch.json --strategy AutoresearchFreqAIStrategy --timerange 20250101-20250601 --export trades --backtest-filename /Users/maryamsediqi/autoresearch/freqtrade/runs/backtest_AutoresearchFreqAIStrategy_20260310T154730Z.json --strategy-path /Users/maryamsediqi/autoresearch/freqtrade/strategies --freqaimodel PyTorchMLPRegressor
+
+2026-03-10 16:47:30,401 - freqtrade - INFO - freqtrade 2026.2
+2026-03-10 16:47:30,809 - numexpr.utils - INFO - NumExpr defaulting to 8 threads.
+2026-03-10 16:47:31,939 - freqtrade.configuration.load_config - INFO - Using config: user_data/config_freqai_autoresearch.json ...
+2026-03-10 16:47:31,943 - freqtrade.loggers - INFO - Enabling colorized output.
+2026-03-10 16:47:31,943 - freqtrade.loggers - INFO - Logfile configured
+2026-03-10 16:47:31,943 - freqtrade.loggers - INFO - Verbosity set to 0
+2026-03-10 16:47:31,943 - freqtrade.configuration.configuration - INFO - Using additional Strategy lookup path: /Users/maryamsediqi/autoresearch/freqtrade/strategies
+2026-03-10 16:47:31,943 - freqtrade.configuration.configuration - INFO - Using max_open_trades: 2 ...
+2026-03-10 16:47:31,944 - freqtrade.configuration.configuration - INFO - Parameter --timerange detected: 20250101-20250601 ...
+2026-03-10 16:47:31,944 - freqtrade.configuration.configuration - INFO - Using user-data directory: /Users/maryamsediqi/freqtrade/user_data ...
+2026-03-10 16:47:31,944 - freqtrade.configuration.configuration - INFO - Using data directory: /Users/maryamsediqi/freqtrade/user_data/data/binance ...
+2026-03-10 16:47:31,944 - freqtrade.configuration.configuration - INFO - Storing backtest results to 
+/Users/maryamsediqi/autoresearch/freqtrade/runs/backtest_AutoresearchFreqAIStrategy_20260310T154730Z.json ...
+2026-03-10 16:47:31,944 - freqtrade.configuration.configuration - WARNING - DEPRECATED: Using `--export-filename` has no impact when backtesting. Please use `--notes` to annotate backtest results and 
+`--backtest-directory` to specify the output directory. 
+2026-03-10 16:47:31,944 - freqtrade.configuration.configuration - INFO - Parameter --export detected: trades ...
+2026-03-10 16:47:31,945 - freqtrade.configuration.configuration - INFO - Parameter --cache=day detected ...
+2026-03-10 16:47:31,945 - freqtrade.configuration.configuration - INFO - Filter trades by timerange: 20250101-20250601
+2026-03-10 16:47:31,945 - freqtrade.configuration.configuration - INFO - Using freqaimodel class name: PyTorchMLPRegressor
+2026-03-10 16:47:31,945 - freqtrade.exchange.check_exchange - INFO - Checking exchange...
+2026-03-10 16:47:31,949 - freqtrade.exchange.check_exchange - INFO - Exchange "binance" is officially supported by the Freqtrade development team.
+2026-03-10 16:47:31,949 - freqtrade.configuration.configuration - INFO - Using pairlist from configuration.
+2026-03-10 16:47:31,949 - freqtrade.configuration.config_validation - INFO - Validating configuration ...
+2026-03-10 16:47:31,950 - freqtrade.commands.optimize_commands - INFO - Starting freqtrade in Backtesting mode
+2026-03-10 16:47:31,951 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled
+2026-03-10 16:47:31,951 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.39
+2026-03-10 16:47:31,951 - freqtrade.exchange.exchange - INFO - Applying additional ccxt config: {'options': {'defaultType': 'swap'}}
+2026-03-10 16:47:31,954 - freqtrade.exchange.exchange - INFO - Applying additional ccxt config: {'options': {'defaultType': 'swap'}}
+2026-03-10 16:47:31,958 - freqtrade.exchange.exchange - INFO - Using Exchange "Binance"
+2026-03-10 16:47:33,416 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange 'Binance'...
+2026-03-10 16:47:33,428 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy AutoresearchFreqAIStrategy from 
+'/Users/maryamsediqi/autoresearch/freqtrade/strategies/AutoresearchFreqAIStrategy.py'...
+2026-03-10 16:47:33,428 - freqtrade.strategy.hyper - INFO - Found no parameter file.
+2026-03-10 16:47:33,428 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'timeframe' with value from the configuration: 5m.
+2026-03-10 16:47:33,428 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.
+2026-03-10 16:47:33,429 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 75.
+2026-03-10 16:47:33,429 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: 2.
+2026-03-10 16:47:33,429 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.02, '60': 0.01, '180': 0.0}
+2026-03-10 16:47:33,429 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 5m
+2026-03-10 16:47:33,429 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.02
+2026-03-10 16:47:33,429 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: False
+2026-03-10 16:47:33,429 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.0
+2026-03-10 16:47:33,429 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: False
+2026-03-10 16:47:33,429 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False
+2026-03-10 16:47:33,430 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True
+2026-03-10 16:47:33,430 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'limit', 'exit': 'limit', 'stoploss': 'limit', 'stoploss_on_exchange': False, 
+'stoploss_on_exchange_interval': 60}
+2026-03-10 16:47:33,430 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}
+2026-03-10 16:47:33,430 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT
+2026-03-10 16:47:33,430 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 75
+2026-03-10 16:47:33,430 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 240
+2026-03-10 16:47:33,430 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: True
+2026-03-10 16:47:33,430 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: False
+2026-03-10 16:47:33,430 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False
+2026-03-10 16:47:33,431 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.0
+2026-03-10 16:47:33,431 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False
+2026-03-10 16:47:33,431 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0
+2026-03-10 16:47:33,431 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False
+2026-03-10 16:47:33,431 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1
+2026-03-10 16:47:33,431 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: 2
+2026-03-10 16:47:33,431 - freqtrade.configuration.config_validation - INFO - Validating configuration ...
+2026-03-10 16:47:33,437 - freqtrade.resolvers.iresolver - INFO - Using resolved pairlist StaticPairList from '/Users/maryamsediqi/freqtrade/freqtrade/plugins/pairlist/StaticPairList.py'...
+2026-03-10 16:47:33,440 - freqtrade.optimize.backtesting - INFO - Using fee 0.0500% - worst case fee from exchange (lowest tier).
+2026-03-10 16:47:33,441 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 5m to 8880
+2026-03-10 16:47:33,595 - freqtrade.optimize.backtesting - INFO - Loading data from 2024-12-01 04:00:00 up to 2025-06-01 00:00:00 (181 days).
+2026-03-10 16:47:34,047 - freqtrade.optimize.backtesting - INFO - Dataload complete. Calculating indicators
+2026-03-10 16:47:34,051 - freqtrade.optimize.backtesting - INFO - Running backtesting for Strategy AutoresearchFreqAIStrategy
+2026-03-10 16:47:36,138 - freqtrade.resolvers.iresolver - INFO - Using resolved freqaimodel PyTorchMLPRegressor from 
+'/Users/maryamsediqi/freqtrade/freqtrade/freqai/prediction_models/PyTorchMLPRegressor.py'...
+2026-03-10 16:47:36,139 - freqtrade.freqai.data_drawer - INFO - Could not find existing datadrawer, starting from scratch
+2026-03-10 16:47:36,139 - freqtrade.freqai.data_drawer - INFO - Could not find existing historic_predictions, starting from scratch
+2026-03-10 16:47:36,139 - freqtrade.freqai.freqai_interface - INFO - Set fresh train queue from whitelist. Queue: ['BTC/USDT:USDT', 'ETH/USDT:USDT']
+2026-03-10 16:47:36,235 - freqtrade.freqai.freqai_interface - INFO - Training 22 timeranges
+2026-03-10 16:47:36,236 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2024-12-02 00:00:00 to 2025-01-01 00:00:00, 1/22 trains
+2026-03-10 16:47:36,239 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1735689600_prediction.feather
+2026-03-10 16:47:36,252 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 15m to 3120
+2026-03-10 16:47:36,252 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 15m from 2024-11-29 12:00:00 to 2025-06-01 00:00:00
+2026-03-10 16:47:36,293 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 1h to 960
+2026-03-10 16:47:36,293 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 1h from 2024-11-22 00:00:00 to 2025-06-01 00:00:00
+2026-03-10 16:47:36,312 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 5m to 8880
+2026-03-10 16:47:36,313 - freqtrade.data.dataprovider - INFO - Loading data for ETH/USDT:USDT 5m from 2024-12-01 04:00:00 to 2025-06-01 00:00:00
+2026-03-10 16:47:36,391 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 15m to 3120
+2026-03-10 16:47:36,392 - freqtrade.data.dataprovider - INFO - Loading data for ETH/USDT:USDT 15m from 2024-11-29 12:00:00 to 2025-06-01 00:00:00
+2026-03-10 16:47:36,423 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 1h to 960
+2026-03-10 16:47:36,423 - freqtrade.data.dataprovider - INFO - Loading data for ETH/USDT:USDT 1h from 2024-11-22 00:00:00 to 2025-06-01 00:00:00
+2026-03-10 16:47:36,443 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2024-12-09 00:00:00 to 2025-01-08 00:00:00, 2/22 trains
+2026-03-10 16:47:36,446 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1736294400_prediction.feather
+2026-03-10 16:47:36,447 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2024-12-16 00:00:00 to 2025-01-15 00:00:00, 3/22 trains
+2026-03-10 16:47:36,448 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1736899200_prediction.feather
+2026-03-10 16:47:36,449 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2024-12-23 00:00:00 to 2025-01-22 00:00:00, 4/22 trains
+2026-03-10 16:47:36,451 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1737504000_prediction.feather
+2026-03-10 16:47:36,451 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2024-12-30 00:00:00 to 2025-01-29 00:00:00, 5/22 trains
+2026-03-10 16:47:36,453 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1738108800_prediction.feather
+2026-03-10 16:47:36,454 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-01-06 00:00:00 to 2025-02-05 00:00:00, 6/22 trains
+2026-03-10 16:47:36,456 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1738713600_prediction.feather
+2026-03-10 16:47:36,457 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-01-13 00:00:00 to 2025-02-12 00:00:00, 7/22 trains
+2026-03-10 16:47:36,459 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1739318400_prediction.feather
+2026-03-10 16:47:36,460 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-01-20 00:00:00 to 2025-02-19 00:00:00, 8/22 trains
+2026-03-10 16:47:36,461 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1739923200_prediction.feather
+2026-03-10 16:47:36,462 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-01-27 00:00:00 to 2025-02-26 00:00:00, 9/22 trains
+2026-03-10 16:47:36,464 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1740528000_prediction.feather
+2026-03-10 16:47:36,465 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-02-03 00:00:00 to 2025-03-05 00:00:00, 10/22 trains
+2026-03-10 16:47:36,467 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1741132800_prediction.feather
+2026-03-10 16:47:36,468 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-02-10 00:00:00 to 2025-03-12 00:00:00, 11/22 trains
+2026-03-10 16:47:36,470 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1741737600_prediction.feather
+2026-03-10 16:47:36,471 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-02-17 00:00:00 to 2025-03-19 00:00:00, 12/22 trains
+2026-03-10 16:47:36,472 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1742342400_prediction.feather
+2026-03-10 16:47:36,473 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-02-24 00:00:00 to 2025-03-26 00:00:00, 13/22 trains
+2026-03-10 16:47:36,474 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1742947200_prediction.feather
+2026-03-10 16:47:36,475 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-03-03 00:00:00 to 2025-04-02 00:00:00, 14/22 trains
+2026-03-10 16:47:36,476 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1743552000_prediction.feather
+2026-03-10 16:47:36,477 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-03-10 00:00:00 to 2025-04-09 00:00:00, 15/22 trains
+2026-03-10 16:47:36,478 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1744156800_prediction.feather
+2026-03-10 16:47:36,479 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-03-17 00:00:00 to 2025-04-16 00:00:00, 16/22 trains
+2026-03-10 16:47:36,481 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1744761600_prediction.feather
+2026-03-10 16:47:36,482 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-03-24 00:00:00 to 2025-04-23 00:00:00, 17/22 trains
+2026-03-10 16:47:36,483 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1745366400_prediction.feather
+2026-03-10 16:47:36,484 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-03-31 00:00:00 to 2025-04-30 00:00:00, 18/22 trains
+2026-03-10 16:47:36,485 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1745971200_prediction.feather
+2026-03-10 16:47:36,486 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-04-07 00:00:00 to 2025-05-07 00:00:00, 19/22 trains
+2026-03-10 16:47:36,487 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1746576000_prediction.feather
+2026-03-10 16:47:36,488 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-04-14 00:00:00 to 2025-05-14 00:00:00, 20/22 trains
+2026-03-10 16:47:36,489 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1747180800_prediction.feather
+2026-03-10 16:47:36,490 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-04-21 00:00:00 to 2025-05-21 00:00:00, 21/22 trains
+2026-03-10 16:47:36,491 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1747785600_prediction.feather
+2026-03-10 16:47:36,492 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/2 pairs from 2025-04-28 00:00:00 to 2025-05-28 00:00:00, 22/22 trains
+2026-03-10 16:47:36,493 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_btc_1748390400_prediction.feather
+2026-03-10 16:47:36,508 - freqtrade.freqai.freqai_interface - INFO - Training 22 timeranges
+2026-03-10 16:47:36,508 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2024-12-02 00:00:00 to 2025-01-01 00:00:00, 1/22 trains
+2026-03-10 16:47:36,510 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1735689600_prediction.feather
+2026-03-10 16:47:36,545 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 5m to 8880
+2026-03-10 16:47:36,545 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 5m from 2024-12-01 04:00:00 to 2025-06-01 00:00:00
+2026-03-10 16:47:36,655 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2024-12-09 00:00:00 to 2025-01-08 00:00:00, 2/22 trains
+2026-03-10 16:47:36,657 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1736294400_prediction.feather
+2026-03-10 16:47:36,658 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2024-12-16 00:00:00 to 2025-01-15 00:00:00, 3/22 trains
+2026-03-10 16:47:36,660 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1736899200_prediction.feather
+2026-03-10 16:47:36,661 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2024-12-23 00:00:00 to 2025-01-22 00:00:00, 4/22 trains
+2026-03-10 16:47:36,662 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1737504000_prediction.feather
+2026-03-10 16:47:36,663 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2024-12-30 00:00:00 to 2025-01-29 00:00:00, 5/22 trains
+2026-03-10 16:47:36,664 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1738108800_prediction.feather
+2026-03-10 16:47:36,665 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-01-06 00:00:00 to 2025-02-05 00:00:00, 6/22 trains
+2026-03-10 16:47:36,666 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1738713600_prediction.feather
+2026-03-10 16:47:36,667 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-01-13 00:00:00 to 2025-02-12 00:00:00, 7/22 trains
+2026-03-10 16:47:36,668 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1739318400_prediction.feather
+2026-03-10 16:47:36,669 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-01-20 00:00:00 to 2025-02-19 00:00:00, 8/22 trains
+2026-03-10 16:47:36,671 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1739923200_prediction.feather
+2026-03-10 16:47:36,672 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-01-27 00:00:00 to 2025-02-26 00:00:00, 9/22 trains
+2026-03-10 16:47:36,673 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1740528000_prediction.feather
+2026-03-10 16:47:36,674 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-02-03 00:00:00 to 2025-03-05 00:00:00, 10/22 trains
+2026-03-10 16:47:36,675 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1741132800_prediction.feather
+2026-03-10 16:47:36,676 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-02-10 00:00:00 to 2025-03-12 00:00:00, 11/22 trains
+2026-03-10 16:47:36,677 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1741737600_prediction.feather
+2026-03-10 16:47:36,678 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-02-17 00:00:00 to 2025-03-19 00:00:00, 12/22 trains
+2026-03-10 16:47:36,680 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1742342400_prediction.feather
+2026-03-10 16:47:36,681 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-02-24 00:00:00 to 2025-03-26 00:00:00, 13/22 trains
+2026-03-10 16:47:36,682 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1742947200_prediction.feather
+2026-03-10 16:47:36,683 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-03-03 00:00:00 to 2025-04-02 00:00:00, 14/22 trains
+2026-03-10 16:47:36,684 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1743552000_prediction.feather
+2026-03-10 16:47:36,685 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-03-10 00:00:00 to 2025-04-09 00:00:00, 15/22 trains
+2026-03-10 16:47:36,686 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1744156800_prediction.feather
+2026-03-10 16:47:36,687 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-03-17 00:00:00 to 2025-04-16 00:00:00, 16/22 trains
+2026-03-10 16:47:36,689 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1744761600_prediction.feather
+2026-03-10 16:47:36,690 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-03-24 00:00:00 to 2025-04-23 00:00:00, 17/22 trains
+2026-03-10 16:47:36,691 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1745366400_prediction.feather
+2026-03-10 16:47:36,692 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-03-31 00:00:00 to 2025-04-30 00:00:00, 18/22 trains
+2026-03-10 16:47:36,693 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1745971200_prediction.feather
+2026-03-10 16:47:36,694 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-04-07 00:00:00 to 2025-05-07 00:00:00, 19/22 trains
+2026-03-10 16:47:36,696 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1746576000_prediction.feather
+2026-03-10 16:47:36,697 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-04-14 00:00:00 to 2025-05-14 00:00:00, 20/22 trains
+2026-03-10 16:47:36,698 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1747180800_prediction.feather
+2026-03-10 16:47:36,699 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-04-21 00:00:00 to 2025-05-21 00:00:00, 21/22 trains
+2026-03-10 16:47:36,700 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1747785600_prediction.feather
+2026-03-10 16:47:36,701 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/2 pairs from 2025-04-28 00:00:00 to 2025-05-28 00:00:00, 22/22 trains
+2026-03-10 16:47:36,702 - freqtrade.freqai.data_kitchen - INFO - Found backtesting prediction file at 
+/Users/maryamsediqi/freqtrade/user_data/models/autoresearch-v1/backtesting_predictions/cb_eth_1748390400_prediction.feather
+2026-03-10 16:47:36,718 - freqtrade.optimize.backtesting - INFO - Backtesting with data from 2025-01-01 00:00:00 up to 2025-06-01 00:00:00 (151 days).
+2026-03-10 16:47:40,870 - freqtrade.misc - INFO - dumping json to "/Users/maryamsediqi/freqtrade/user_data/backtest_results/backtest-result-2026-03-10_16-47-40.meta.json"
+Result for strategy AutoresearchFreqAIStrategy
+                                                BACKTESTING REPORT                                                
+┏━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃          Pair ┃ Trades ┃ Avg Profit % ┃ Tot Profit USDT ┃ Tot Profit % ┃ Avg Duration ┃  Win  Draw  Loss  Win% ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ BTC/USDT:USDT │      0 │          0.0 │           0.000 │          0.0 │         0:00 │    0     0     0     0 │
+│ ETH/USDT:USDT │   1697 │        -0.15 │        -187.805 │       -18.78 │      1:08:00 │  914    51   732  53.9 │
+│         TOTAL │   1697 │        -0.15 │        -187.805 │       -18.78 │      1:08:00 │  914    51   732  53.9 │
+└───────────────┴────────┴──────────────┴─────────────────┴──────────────┴──────────────┴────────────────────────┘
+                                             LEFT OPEN TRADES REPORT                                              
+┏━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃          Pair ┃ Trades ┃ Avg Profit % ┃ Tot Profit USDT ┃ Tot Profit % ┃ Avg Duration ┃  Win  Draw  Loss  Win% ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ ETH/USDT:USDT │      1 │         -0.2 │          -0.148 │        -0.01 │      0:15:00 │    0     0     1     0 │
+│         TOTAL │      1 │         -0.2 │          -0.148 │        -0.01 │      0:15:00 │    0     0     1     0 │
+└───────────────┴────────┴──────────────┴─────────────────┴──────────────┴──────────────┴────────────────────────┘
+                                                ENTER TAG STATS                                                
+┏━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Enter Tag ┃ Entries ┃ Avg Profit % ┃ Tot Profit USDT ┃ Tot Profit % ┃ Avg Duration ┃  Win  Draw  Loss  Win% ┃
+┡━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+│  ml_short │     775 │        -0.12 │         -65.719 │        -6.57 │      1:15:00 │  418    27   330  53.9 │
+│   ml_long │     922 │        -0.18 │        -122.086 │       -12.21 │      1:02:00 │  496    24   402  53.8 │
+│     TOTAL │    1697 │        -0.15 │        -187.805 │       -18.78 │      1:08:00 │  914    51   732  53.9 │
+└───────────┴─────────┴──────────────┴─────────────────┴──────────────┴──────────────┴────────────────────────┘
+                                                EXIT REASON STATS                                                
+┏━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃   Exit Reason ┃ Exits ┃ Avg Profit % ┃ Tot Profit USDT ┃ Tot Profit % ┃ Avg Duration ┃  Win  Draw  Loss  Win% ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+│           roi │   207 │         0.87 │         132.429 │        13.24 │      2:01:00 │  156    51     0   100 │
+│ ml_exit_short │  1175 │         0.06 │          53.917 │         5.39 │      0:56:00 │  708     0   467  60.3 │
+│       ml_exit │    67 │         0.18 │           8.792 │         0.88 │      0:56:00 │   50     0    17  74.6 │
+│    force_exit │     1 │         -0.2 │          -0.148 │        -0.01 │      0:15:00 │    0     0     1     0 │
+│     stop_loss │   247 │         -2.1 │        -382.796 │       -38.28 │      1:25:00 │    0     0   247     0 │
+│         TOTAL │  1697 │        -0.15 │        -187.805 │       -18.78 │      1:08:00 │  914    51   732  53.9 │
+└───────────────┴───────┴──────────────┴─────────────────┴──────────────┴──────────────┴────────────────────────┘
+                                                       MIXED TAG STATS                                                        
+┏━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Enter Tag ┃   Exit Reason ┃ Trades ┃ Avg Profit % ┃ Tot Profit USDT ┃ Tot Profit % ┃ Avg Duration ┃  Win  Draw  Loss  Win% ┃
+┡━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+│   ml_long │           roi │    117 │         0.97 │          83.663 │         8.37 │      1:47:00 │   93    24     0   100 │
+│  ml_short │           roi │     90 │         0.73 │          48.766 │         4.88 │      2:19:00 │   63    27     0   100 │
+│   ml_long │ ml_exit_short │    580 │         0.07 │          29.190 │         2.92 │      0:51:00 │  353     0   227  60.9 │
+│  ml_short │ ml_exit_short │    595 │         0.06 │          24.727 │         2.47 │      1:01:00 │  355     0   240  59.7 │
+│   ml_long │       ml_exit │     67 │         0.18 │           8.792 │         0.88 │      0:56:00 │   50     0    17  74.6 │
+│   ml_long │    force_exit │      1 │         -0.2 │          -0.148 │        -0.01 │      0:15:00 │    0     0     1     0 │
+│  ml_short │     stop_loss │     90 │         -2.1 │        -139.212 │       -13.92 │      1:46:00 │    0     0    90     0 │
+│   ml_long │     stop_loss │    157 │         -2.1 │        -243.584 │       -24.36 │      1:13:00 │    0     0   157     0 │
+│     TOTAL │               │   1697 │        -0.15 │        -187.805 │       -18.78 │      1:08:00 │  914    51   732  53.9 │
+└───────────┴───────────────┴────────┴──────────────┴─────────────────┴──────────────┴──────────────┴────────────────────────┘
+                         SUMMARY METRICS                          
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric                        ┃ Value                          ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Backtesting from              │ 2025-01-01 00:00:00            │
+│ Backtesting to                │ 2025-06-01 00:00:00            │
+│ Trading Mode                  │ Isolated Futures               │
+│ Max open trades               │ 2                              │
+│                               │                                │
+│ Total/Daily Avg Trades        │ 1697 / 11.24                   │
+│ Starting balance              │ 1000 USDT                      │
+│ Final balance                 │ 812.195 USDT                   │
+│ Absolute profit               │ -187.805 USDT                  │
+│ Total profit %                │ -18.78%                        │
+│ CAGR %                        │ -39.52%                        │
+│ Sortino                       │ -36.60                         │
+│ Sharpe                        │ -33.77                         │
+│ Calmar                        │ -12.46                         │
+│ SQN                           │ -6.48                          │
+│ Profit factor                 │ 0.62                           │
+│ Expectancy (Ratio)            │ -0.11 (-0.19)                  │
+│ Avg. daily profit             │ -1.244 USDT                    │
+│ Avg. stake amount             │ 73.794 USDT                    │
+│ Total trade volume            │ 250536.124 USDT                │
+│                               │                                │
+│ Long / Short trades           │ 922 / 775                      │
+│ Long / Short profit %         │ -12.21% / -6.57%               │
+│ Long / Short profit USDT      │ -122.086 / -65.719             │
+│                               │                                │
+│ Best Pair                     │ BTC/USDT:USDT 0.00%            │
+│ Worst Pair                    │ ETH/USDT:USDT -18.78%          │
+│ Best trade                    │ ETH/USDT:USDT 2.00%            │
+│ Worst trade                   │ ETH/USDT:USDT -2.11%           │
+│ Best day                      │ 3.028 USDT                     │
+│ Worst day                     │ -13.37 USDT                    │
+│ Days win/draw/lose            │ 44 / 0 / 108                   │
+│ Min/Max/Avg. Duration Winners │ 0d 00:00 / 0d 03:00 / 0d 00:48 │
+│ Min/Max/Avg. Duration Losers  │ 0d 00:00 / 0d 10:25 / 0d 01:22 │
+│ Max Consecutive Wins / Loss   │ 11 / 9                         │
+│ Rejected Entry signals        │ 0                              │
+│ Entry/Exit Timeouts           │ 0 / 0                          │
+│                               │                                │
+│ Min balance                   │ 811.119 USDT                   │
+│ Max balance                   │ 1002.3 USDT                    │
+│ Max % of account underwater   │ 19.07%                         │
+│ Absolute drawdown             │ 191.181 USDT (19.07%)          │
+│ Drawdown duration             │ 148 days 11:00:00              │
+│ Profit at drawdown start      │ 2.3 USDT                       │
+│ Profit at drawdown end        │ -188.881 USDT                  │
+│ Drawdown start                │ 2025-01-02 14:30:00            │
+│ Drawdown end                  │ 2025-05-31 01:30:00            │
+│ Market change                 │ -6.43%                         │
+└───────────────────────────────┴────────────────────────────────┘
+
+Backtested 2025-01-01 00:00:00 -> 2025-06-01 00:00:00 | Max open trades : 2
+                                                                   STRATEGY SUMMARY                                                                   
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+┃                   Strategy ┃ Trades ┃ Avg Profit % ┃ Tot Profit USDT ┃ Tot Profit % ┃ Avg Duration ┃  Win  Draw  Loss  Win% ┃             Drawdown ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+│ AutoresearchFreqAIStrategy │   1697 │        -0.15 │        -187.805 │       -18.78 │      1:08:00 │  914    51   732  53.9 │ 191.181 USDT  19.07% │
+└────────────────────────────┴────────┴──────────────┴─────────────────┴──────────────┴──────────────┴────────────────────────┴──────────────────────┘
+

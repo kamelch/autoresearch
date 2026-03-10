@@ -1,0 +1,83 @@
+{
+  "params": {
+    "long_entry_ret": {
+      "active_max": 0.02,
+      "active_min": 0.001,
+      "crash_count": 0,
+      "discard_count": 0,
+      "hard_max": 0.02,
+      "hard_min": 0.001,
+      "keep_count": 0,
+      "step": 0.001,
+      "weight": 1.0
+    },
+    "long_exit_prob_max": {
+      "active_max": 0.6,
+      "active_min": 0.4,
+      "crash_count": 0,
+      "discard_count": 0,
+      "hard_max": 0.6,
+      "hard_min": 0.4,
+      "keep_count": 0,
+      "step": 0.01,
+      "weight": 1.0
+    },
+    "long_prob_min": {
+      "active_max": 0.75,
+      "active_min": 0.5,
+      "crash_count": 0,
+      "discard_count": 0,
+      "hard_max": 0.75,
+      "hard_min": 0.5,
+      "keep_count": 0,
+      "step": 0.01,
+      "weight": 1.0
+    },
+    "short_entry_ret": {
+      "active_max": -0.001,
+      "active_min": -0.02,
+      "crash_count": 0,
+      "discard_count": 0,
+      "hard_max": -0.001,
+      "hard_min": -0.02,
+      "keep_count": 0,
+      "step": 0.001,
+      "weight": 1.0
+    },
+    "short_exit_prob_min": {
+      "active_max": 0.64,
+      "active_min": 0.4,
+      "crash_count": 0,
+      "discard_count": 2,
+      "hard_max": 0.65,
+      "hard_min": 0.4,
+      "keep_count": 0,
+      "step": 0.01,
+      "weight": 0.81
+    },
+    "short_prob_max": {
+      "active_max": 0.5,
+      "active_min": 0.35,
+      "crash_count": 0,
+      "discard_count": 2,
+      "hard_max": 0.5,
+      "hard_min": 0.25,
+      "keep_count": 0,
+      "step": 0.01,
+      "weight": 0.81
+    },
+    "stoploss": {
+      "active_max": -0.005,
+      "active_min": -0.06,
+      "crash_count": 0,
+      "discard_count": 0,
+      "hard_max": -0.005,
+      "hard_min": -0.06,
+      "keep_count": 0,
+      "step": 0.001,
+      "weight": 1.0
+    }
+  },
+  "updated_at": "2026-03-10T16:01:13.239606+00:00",
+  "version": 1
+}

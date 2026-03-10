@@ -45,6 +45,7 @@
     "backtest_period_days": 7,
     "live_retrain_hours": 6,
     "expiration_hours": 12,
+    "conv_width": 64,
     "feature_parameters": {
       "include_timeframes": [
         "5m",
@@ -75,9 +76,10 @@
         "n_epochs": null
       },
       "model_kwargs": {
-        "hidden_dim": 256,
-        "dropout_percent": 0.1,
-        "n_layer": 2
+        "hidden_dim": 512,
+        "n_layer": 3,
+        "dropout_percent": 0.25,
+        "fc_hidden_dim": 256
       }
     }
   },
