@@ -47,6 +47,16 @@ Hi have a look at program.md and let's kick off a new experiment! let's do the s
 
 The `program.md` file is essentially a super lightweight "skill".
 
+## Freqtrade integration (backtest + dry/live)
+
+If you want buy/sell workflows on exchange candle data, use the starter files in [`freqtrade/`](freqtrade):
+
+- `freqtrade/strategies/AutoresearchFreqAIStrategy.py` — FreqAI-enabled futures strategy (long/short).
+- `freqtrade/config/config_freqai_autoresearch.example.json` — futures config baseline (Binance perp defaults).
+- `freqtrade/README.md` — end-to-end commands for data download, backtesting, dry-run, and live transition.
+
+This path uses Freqtrade's FreqAI pipeline (retraining + inference in trading loop), which is a better fit for trading decisions than the default `train.py` language-model objective.
+
 ## Project structure
 
 ```
@@ -76,3 +86,11 @@ If you're going to be using autoresearch on Apple Macbooks in particular, I'd re
 ## License
 
 MIT
+
+### Trading Autoresearch Mode
+
+If you're using this repo for Freqtrade/FreqAI optimization, use:
+- `program.trading.md` for the autonomous loop instructions.
+- `scripts/run_freqtrade_backtest.py` for per-experiment run/log/score.
+- `scripts/automate_freqai_pipeline.py` for one-command setup + loop automation.
+- `freqtrade/results.tsv` for keep/discard history.
