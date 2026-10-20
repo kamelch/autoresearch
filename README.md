@@ -1,4 +1,4 @@
-# autoresearch
+# FreqAI Autoresearch Starter
 
 ![teaser](progress.png)
 
@@ -112,3 +112,11 @@ trading performance or replace a real backtest.
 
 Generated campaign artifacts are described in [freqtrade/README.md](freqtrade/README.md#generated-files-and-version-control).
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branch, file, and commit conventions.
+
+## Repository purpose and workflow
+
+Single-GPU autoresearch project extended with a FreqAI campaign starter pipeline.
+
+Canonical repository: https://github.com/kamelch/freqai-autoresearch-starter
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for commit, branch, validation, and generated-file conventions.
