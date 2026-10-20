@@ -94,3 +94,21 @@ If you're using this repo for Freqtrade/FreqAI optimization, use:
 - `scripts/run_freqtrade_backtest.py` for per-experiment run/log/score.
 - `scripts/automate_freqai_pipeline.py` for one-command setup + loop automation.
 - `freqtrade/results.tsv` for keep/discard history.
+
+## Development checks
+
+Run the existing orchestration tests from the repository root:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The campaign loop uses POSIX file locking; its lock-dependent tests currently fail
+on Windows. Run the full suite in a POSIX environment (for example, Linux).
+
+The LSTM model smoke tests require the scientific Python and PyTorch dependencies;
+they skip when those dependencies are unavailable. These tests do not establish
+trading performance or replace a real backtest.
+
+Generated campaign artifacts are described in [freqtrade/README.md](freqtrade/README.md#generated-files-and-version-control).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branch, file, and commit conventions.

@@ -9,12 +9,13 @@ Default tuning assumptions:
 
 ## 1) Put files into your Freqtrade user dir
 
-From your Freqtrade project directory:
+From your Freqtrade project directory, replace `/path/to/autoresearch` below
+with the absolute path to your clone:
 
 ```bash
 mkdir -p user_data/strategies
-cp /Users/maryamsediqi/autoresearch/freqtrade/strategies/AutoresearchFreqAIStrategy.py user_data/strategies/
-cp /Users/maryamsediqi/autoresearch/freqtrade/config/config_freqai_autoresearch.example.json user_data/config_freqai_autoresearch.json
+cp /path/to/autoresearch/freqtrade/strategies/AutoresearchFreqAIStrategy.py user_data/strategies/
+cp /path/to/autoresearch/freqtrade/config/config_freqai_autoresearch.example.json user_data/config_freqai_autoresearch.json
 ```
 
 Edit `user_data/config_freqai_autoresearch.json`:
@@ -48,7 +49,7 @@ freqtrade backtesting \
   --strategy AutoresearchFreqAIStrategy \
   --strategy-path user_data/strategies \
   --freqaimodel AutoresearchLSTMRegressor \
-  --freqaimodel-path /Users/maryamsediqi/autoresearch/freqtrade/freqaimodels \
+  --freqaimodel-path /path/to/autoresearch/freqtrade/freqaimodels \
   --timerange 20250101-20260301
 ```
 
@@ -60,7 +61,7 @@ freqtrade trade \
   --strategy AutoresearchFreqAIStrategy \
   --strategy-path user_data/strategies \
   --freqaimodel AutoresearchLSTMRegressor \
-  --freqaimodel-path /Users/maryamsediqi/autoresearch/freqtrade/freqaimodels
+  --freqaimodel-path /path/to/autoresearch/freqtrade/freqaimodels
 ```
 
 ## 5) Live trading switch
@@ -86,13 +87,13 @@ Only after stable dry-run results:
 Use the helper runner to execute a single train/holdout candidate row with hard gates and campaign IDs:
 
 ```bash
-python3 /Users/maryamsediqi/autoresearch/scripts/run_freqtrade_backtest.py \
+python3 /path/to/autoresearch/scripts/run_freqtrade_backtest.py \
   --freqtrade-dir /path/to/your/freqtrade \
   --config user_data/config_freqai_autoresearch.json \
   --strategy AutoresearchFreqAIStrategy \
   --strategy-path user_data/strategies \
   --freqaimodel AutoresearchLSTMRegressor \
-  --freqaimodel-path /Users/maryamsediqi/autoresearch/freqtrade/freqaimodels \
+  --freqaimodel-path /path/to/autoresearch/freqtrade/freqaimodels \
   --timerange 20250101-20250401 \
   --campaign-id my_campaign \
   --candidate-id cand_0001 \
@@ -118,13 +119,13 @@ Autonomous mode instructions are in `program.trading.md`.
 3) mutation is kept only if holdout is `keep`
 
 ```bash
-python3 /Users/maryamsediqi/autoresearch/scripts/freqai_autoresearch_loop.py \
+python3 /path/to/autoresearch/scripts/freqai_autoresearch_loop.py \
   --freqtrade-dir /path/to/your/freqtrade \
   --config user_data/config_freqai_autoresearch.json \
   --strategy AutoresearchFreqAIStrategy \
-  --strategy-path /Users/maryamsediqi/autoresearch/freqtrade/strategies \
+  --strategy-path /path/to/autoresearch/freqtrade/strategies \
   --freqaimodel AutoresearchLSTMRegressor \
-  --freqaimodel-path /Users/maryamsediqi/autoresearch/freqtrade/freqaimodels \
+  --freqaimodel-path /path/to/autoresearch/freqtrade/freqaimodels \
   --train-timerange 20250101-20250401 \
   --holdout-timerange 20250401-20250601 \
   --campaign-id my_campaign \
@@ -135,7 +136,7 @@ Optional Chronos selection for any command:
 
 ```bash
 --freqaimodel AmazonChronos2Regressor \
---freqaimodel-path /Users/maryamsediqi/autoresearch/freqtrade/freqaimodels
+--freqaimodel-path /path/to/autoresearch/freqtrade/freqaimodels
 ```
 
 Loop v2 defaults are campaign-scoped:
@@ -158,7 +159,7 @@ This command automates:
 5) final campaign holdout ranking
 
 ```bash
-python3 /Users/maryamsediqi/autoresearch/scripts/automate_freqai_pipeline.py \
+python3 /path/to/autoresearch/scripts/automate_freqai_pipeline.py \
   --freqtrade-dir /path/to/your/freqtrade \
   --train-timerange 20250101-20250401 \
   --holdout-timerange 20250401-20250601 \
@@ -174,7 +175,7 @@ Optional:
 - `--skip-download` if data is already present
 - `--overwrite-config` to refresh config from template
 - `--freqtrade-bin /path/to/your/freqtrade/.venv/bin/freqtrade` if `freqtrade` is not in PATH
-- `--freqaimodel-path /Users/maryamsediqi/autoresearch/freqtrade/freqaimodels` for custom model lookup
+- `--freqaimodel-path /path/to/autoresearch/freqtrade/freqaimodels` for custom model lookup
 - `--campaign-id <id>` to force a specific campaign ID
 - `--profile /path/to/profile.json` to force a specific profile
 - `--no-space-adaptation` to disable automatic search-space updates
@@ -198,3 +199,17 @@ LLM credentials JSON format (`~/.config/autoresearch/openai.json` by default):
 
 - Legacy mixed files like `freqtrade/results.tsv` are still readable for manual inspection.
 - v2 decisions are intended to run on campaign-specific TSV files (`freqtrade/results/results_<campaign_id>.tsv`) so older campaigns cannot contaminate keep/discard decisions.
+
+## Generated files and version control
+
+`runs/` contains generated backtest logs, review logs, locks, and resumable search
+state. Campaign profiles named `autoresearch_profile.<campaign_id>.json` and
+`results/` are also generated locally. They are ignored by Git and recreated by
+the runner or pipeline. Start a new campaign from `autoresearch_profile.example.json`.
+
+The existing `results.tsv` and `results_20250101_20250601.tsv` are retained as
+historical summaries. Detailed logs referenced by those rows may only be available
+in the pre-cleanup backup bundles. To resume an old campaign, recover its matching
+state and profile from a pre-cleanup backup bundle before starting the loop; the clean checkout contains no
+previous campaign state. Deliberately curated results should be documented before
+being added to version control.
